@@ -26,8 +26,8 @@ export class Player {
 
     // 创建玩家物理体
     this.body = Matter.Bodies.rectangle(
-      window.innerWidth / 2,  // 屏幕中央
-      window.innerHeight - 100,  // 距离底部100像素
+      GAME_CONFIG.CANVAS.WIDTH / 2,  // 屏幕中央
+      GAME_CONFIG.CANVAS.HEIGHT - 100,  // 距离底部100像素
       GAME_CONFIG.PLAYER.WIDTH,
       GAME_CONFIG.PLAYER.HEIGHT,
       {
@@ -41,8 +41,8 @@ export class Player {
       }
     );
 
-    // 添加到物理世界
-    Matter.World.add(engine.world, this.body);
+    // 将玩家添加到物理世界
+    Matter.Composite.add(engine.world, this.body);
 
     // 设置键盘控制
     this.setupControls();
@@ -153,7 +153,7 @@ export class Player {
    */
   public update() {
     // 检查是否在地面上
-    const groundLevel = window.innerHeight - GAME_CONFIG.PLAYER.HEIGHT / 2;
+    const groundLevel = GAME_CONFIG.CANVAS.HEIGHT - GAME_CONFIG.PLAYER.HEIGHT / 2;
     if (this.body.position.y >= groundLevel) {
       Matter.Body.setPosition(this.body, {
         x: this.body.position.x,
@@ -169,9 +169,9 @@ export class Player {
         x: halfWidth,
         y: this.body.position.y
       });
-    } else if (this.body.position.x > window.innerWidth - halfWidth) {
+    } else if (this.body.position.x > GAME_CONFIG.CANVAS.WIDTH - halfWidth) {
       Matter.Body.setPosition(this.body, {
-        x: window.innerWidth - halfWidth,
+        x: GAME_CONFIG.CANVAS.WIDTH - halfWidth,
         y: this.body.position.y
       });
     }

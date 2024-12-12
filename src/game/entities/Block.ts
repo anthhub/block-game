@@ -214,4 +214,11 @@ export class Block {
       height: max.y - min.y
     };
   }
+
+  /**
+   * 设置方块下落速度
+   */
+  public setSpeed(speed: number): void {
+    this.speed = speed;
+  }
 }

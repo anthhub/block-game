@@ -22,6 +22,13 @@ export class BlockManager {
   private confirmedTxs: Map<string, number> = new Map(); // 存储交易哈希和确认数
   private confirmationProgress: Map<string, number> = new Map(); // 存储交易哈希和确认进度
   private particleSystem: ParticleSystem;
+  private networkState = {
+    gasPrice: 0,
+    pendingTxCount: 0,
+    lastUpdate: 0,
+    updateInterval: 10000, // 每10秒更新一次网络状态
+  };
+  private onNetworkStateChange?: (state: { gasPrice: number, pendingTxCount: number, congestionLevel: number }) => void;
 
   constructor(engine: Matter.Engine) {
     this.engine = engine;
@@ -29,6 +36,7 @@ export class BlockManager {
     this.particleSystem = new ParticleSystem(engine);
     this.setupBlockchainListener();
     this.calculateNextSpawnInterval();
+    this.startNetworkMonitoring();
   }
 
   private calculateNextSpawnInterval() {
@@ -74,6 +82,91 @@ export class BlockManager {
     } catch (error) {
       console.error('设置区块链监听器失败:', error);
     }
+  }
+
+  /**
+   * 开始监控网络状态
+   */
+  private async startNetworkMonitoring() {
+    const updateNetworkState = async () => {
+      try {
+        const now = Date.now();
+        if (now - this.networkState.lastUpdate < this.networkState.updateInterval) {
+          return;
+        }
+
+        // 获取当前gas价格 (ethers v6)
+        const feeData = await this.provider.getFeeData();
+        this.networkState.gasPrice = parseFloat(ethers.formatUnits(feeData.gasPrice || 0n, 'gwei'));
+
+        // 获取待处理交易数量
+        const pendingBlock = await this.provider.send('eth_getBlockByNumber', ['pending', false]);
+        this.networkState.pendingTxCount = pendingBlock.transactions.length;
+
+        // 计算网络拥堵程度 (0-1)
+        const congestionLevel = this.calculateCongestionLevel();
+
+        // 调整游戏参数
+        this.adjustGameParameters(congestionLevel);
+
+        this.networkState.lastUpdate = now;
+
+        // 触发状态变化回调
+        if (this.onNetworkStateChange) {
+          this.onNetworkStateChange({
+            gasPrice: this.networkState.gasPrice,
+            pendingTxCount: this.networkState.pendingTxCount,
+            congestionLevel
+          });
+        }
+      } catch (error) {
+        console.error('更新网络状态失败:', error);
+      }
+    };
+
+    // 立即更新一次
+    await updateNetworkState();
+    
+    // 定期更新
+    setInterval(updateNetworkState, this.networkState.updateInterval);
+  }
+
+  /**
+   * 计算网络拥堵程度 (0-1)
+   */
+  private calculateCongestionLevel(): number {
+    // Gas价格范围：10-500 Gwei
+    const gasScore = Math.min(Math.max(this.networkState.gasPrice - 10, 0) / 490, 1);
+    
+    // 待处理交易数量范围：0-5000
+    const pendingScore = Math.min(this.networkState.pendingTxCount / 5000, 1);
+    
+    // 综合评分 (gas价格权重0.7，待处理交易权重0.3)
+    return gasScore * 0.7 + pendingScore * 0.3;
+  }
+
+  /**
+   * 根据网络拥堵程度调整游戏参数
+   */
+  private adjustGameParameters(congestionLevel: number) {
+    // 调整生成速度
+    this.baseSpawnInterval = 1000 - congestionLevel * 500; // 500-1000ms
+    
+    // 调整下落速度
+    const minSpeed = 2;
+    const maxSpeed = 5;
+    const newSpeed = minSpeed + congestionLevel * (maxSpeed - minSpeed);
+    this.blocks.forEach(block => block.setSpeed(newSpeed));
+    
+    // 调整难度系数
+    this.difficultyMultiplier = 1 + congestionLevel;
+  }
+
+  /**
+   * 设置网络状态变化回调
+   */
+  public setNetworkStateChangeCallback(callback: (state: { gasPrice: number, pendingTxCount: number, congestionLevel: number }) => void) {
+    this.onNetworkStateChange = callback;
   }
 
   public update() {

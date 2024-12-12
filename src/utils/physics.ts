@@ -1,4 +1,5 @@
 import Matter from 'matter-js';
+import { GAME_CONFIG } from '../config/constants';
 
 export const createPhysicsEngine = () => {
   const engine = Matter.Engine.create();
@@ -11,10 +12,10 @@ export const createRenderer = (engine: Matter.Engine, container: HTMLElement, ca
     engine: engine,
     canvas: canvas,
     options: {
-      width: window.innerWidth,
-      height: window.innerHeight,
+      width: GAME_CONFIG.CANVAS.WIDTH,
+      height: GAME_CONFIG.CANVAS.HEIGHT,
       wireframes: false,
-      background: '#1a1a1a'
+      background: GAME_CONFIG.CANVAS.BACKGROUND_COLOR
     }
   });
 };

@@ -1,4 +1,9 @@
 export const GAME_CONFIG = {
+  CANVAS: {
+    WIDTH: 800,
+    HEIGHT: 600,
+    BACKGROUND_COLOR: '#1a1a1a'
+  },
   PLAYER: {
     WIDTH: 30,
     HEIGHT: 30,
@@ -29,9 +34,9 @@ export const GAME_CONFIG = {
       MEDIUM: 50
     },
     COLORS: {
-      HIGH_GAS: '#ff0000',
-      MEDIUM_GAS: '#ff9900',
-      LOW_GAS: '#0099ff'
+      HIGH: '#ff0000',
+      MEDIUM: '#ffff00',
+      LOW: '#00ff00'
     }
   }
 };

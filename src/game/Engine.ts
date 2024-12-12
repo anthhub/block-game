@@ -3,11 +3,12 @@ import { Player } from './entities/Player';
 import { BlockManager } from './managers/BlockManager';
 import { PowerUpManager } from './managers/PowerUpManager';
 import { GameState } from '../store/gameStore';
+import { ParticleSystem } from './effects/ParticleSystem';
+import { PowerUpIndicator } from './effects/PowerUpIndicator';
 import { HUD } from '../components/HUD';
-import { ParticleSystem } from '../components/ParticleSystem';
-import { PowerUpIndicator } from '../components/PowerUpIndicator';
-import { createPhysicsEngine, createRenderer } from '../utils/physics';
+import { MusicSystem } from './audio/MusicSystem';
 import { GAME_CONFIG } from '../config/constants';
+import { createPhysicsEngine, createRenderer } from '../utils/physics';
 
 /**
  * 游戏主引擎类
@@ -36,6 +37,8 @@ export class Engine {
   private powerUpIndicator: PowerUpIndicator;
   /** 游戏是否结束 */
   private isGameOver: boolean = false;
+  /** 音乐系统 */
+  private musicSystem: MusicSystem;
 
   /**
    * 创建游戏引擎实例
@@ -45,6 +48,7 @@ export class Engine {
   constructor(gameState: GameState, hud: HUD) {
     this.gameState = gameState;
     this.hud = hud;
+    this.musicSystem = new MusicSystem();
     
     // 创建物理引擎并设置重力
     this.engine = createPhysicsEngine();
@@ -64,6 +68,9 @@ export class Engine {
     this.blockManager = new BlockManager(this.engine);
     this.powerUpManager = new PowerUpManager(this.engine, this.powerUpIndicator);
 
+    // 监听网络状态变化
+    this.blockManager.setNetworkStateChangeCallback(this.onNetworkStateChange.bind(this));
+
     // 添加测试按钮
     this.addTestButton();
 
@@ -81,27 +88,83 @@ export class Engine {
     
     // 设置碰撞检测和开始游戏
     this.setupCollisions();
-    this.start();
+
+    // 添加音乐初始化按钮
+    this.addMusicButton();
+
+    // 启动游戏
+    Matter.Runner.run(this.runner, this.engine);
+    Matter.Render.run(this.render);
   }
 
   /**
-   * 创建地面
+   * 添加音乐控制按钮
    */
-  private createGround() {
-    const ground = Matter.Bodies.rectangle(
-      window.innerWidth / 2,
-      window.innerHeight,
-      window.innerWidth,
-      20,
-      {
-        isStatic: true,
-        label: 'ground',
-        render: {
-          fillStyle: '#666666'
-        }
-      }
-    );
-    Matter.World.add(this.engine.world, ground);
+  private addMusicButton(): void {
+    const button = document.createElement('button');
+    button.textContent = '开始音乐';
+    button.style.position = 'fixed';
+    button.style.top = '10px';
+    button.style.right = '150px';
+    button.style.zIndex = '1000';
+    button.style.padding = '8px 16px';
+    button.style.backgroundColor = '#4CAF50';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.borderRadius = '4px';
+    button.style.cursor = 'pointer';
+    
+    button.addEventListener('click', () => {
+      this.musicSystem.initialize();
+      button.style.display = 'none';
+    });
+
+    document.body.appendChild(button);
+  }
+
+  /**
+   * 处理网络状态变化
+   */
+  private onNetworkStateChange(state: { gasPrice: number, pendingTxCount: number, congestionLevel: number }) {
+    // 更新音乐状态
+    this.musicSystem.updateMusicState(state.congestionLevel);
+
+    // 根据拥堵程度调整背景颜色
+    const container = document.getElementById('game-container')!;
+    const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+    
+    // 计算背景颜色
+    const r = Math.floor(30 + state.congestionLevel * 20); // 红色分量随拥堵程度增加
+    const g = Math.floor(30 + (1 - state.congestionLevel) * 20); // 绿色分量随拥堵程度减少
+    const b = 40; // 保持蓝色分量稳定
+    const a = 0.95; // 透明度
+
+    // 设置渐变背景
+    container.style.background = `
+      radial-gradient(
+        circle at 50% 50%,
+        rgba(${r + 10}, ${g + 10}, ${b + 10}, ${a}),
+        rgba(${r}, ${g}, ${b}, ${a})
+      )
+    `;
+
+    // 更新渲染器背景色
+    if (this.render.options.background) {
+      this.render.options.background = `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // 更新地面颜色
+    const ground = this.engine.world.bodies.find(body => body.label === 'ground');
+    if (ground && ground.render) {
+      ground.render.fillStyle = `rgb(${r + 20}, ${g + 20}, ${b + 20})`;
+    }
+
+    // 更新HUD显示
+    this.hud.updateNetworkStatus({
+      gasPrice: state.gasPrice,
+      pendingTxCount: state.pendingTxCount,
+      congestionLevel: state.congestionLevel
+    });
   }
 
   /**
@@ -129,6 +192,8 @@ export class Engine {
               otherBody.position.y,
               (otherBody.render as any).fillStyle
             );
+            // 播放碰撞音效
+            this.musicSystem.playSound('collision');
             if (this.gameState.lives <= 0) {
               this.gameOver();
             }
@@ -144,6 +209,8 @@ export class Engine {
                 otherBody.position.y,
                 '#ffff00'
               );
+              // 播放能量道具音效
+              this.musicSystem.playSound('powerup');
             }
           }
         }
@@ -184,6 +251,7 @@ export class Engine {
     this.isGameOver = true;
     this.hud.showGameOver(this.gameState.score);
     this.cleanup();
+    this.musicSystem.stop();
   }
 
   /**
@@ -332,8 +400,7 @@ export class Engine {
               <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">Transaction Hash</div>
               <div style="font-family: monospace; word-break: break-all; opacity: 0.9; font-size: 12px;">${details.hash}</div>
             </div>
-          </div>
-        `;
+          `;
         
         // 设置提示框位置
         tooltip.style.display = 'block';
@@ -357,5 +424,19 @@ export class Engine {
     canvas.addEventListener('mouseleave', () => {
       tooltip.style.display = 'none';
     });
+  }
+
+  /**
+   * 创建地面
+   */
+  private createGround(): void {
+    const ground = Matter.Bodies.rectangle(
+      GAME_CONFIG.CANVAS.WIDTH / 2,
+      GAME_CONFIG.CANVAS.HEIGHT - 10,
+      GAME_CONFIG.CANVAS.WIDTH,
+      20,
+      { isStatic: true }
+    );
+    Matter.Composite.add(this.engine.world, ground);
   }
 }
