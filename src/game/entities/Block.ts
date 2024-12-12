@@ -18,12 +18,12 @@ export class Block {
   private tx: ethers.TransactionResponse;
   /** 方块移动速度 */
   private speed: number = 2;
+  private isLanded: boolean = false;
   private confirmations: number = 0;
-  private readonly requiredConfirmations: number = 1; // 需要的确认数
   private isConfirming: boolean = false;
   private opacity: number = 1;
-  private fadeOutSpeed: number = 0.1;
-  private isLanded: boolean = false;
+  private currentScale: number = 1;
+  private fadeSpeed: number = 0.05;
 
   /**
    * 创建一个新的方块实例
@@ -51,9 +51,6 @@ export class Block {
       density: 0.001,       // 降低密度，使其下落更慢
     });
 
-    // 更新渲染属性
-    this.updateRenderText();
-    
     // 添加交易信息到方块的用户数据中
     this.body.render.text = {
       content: `${formatEthAmount(tx.value)}\n${formatAddress(tx.from)} → ${formatAddress(tx.to || '')}`,
@@ -87,19 +84,6 @@ export class Block {
     Matter.Body.setAngularVelocity(this.body, 0);
   }
 
-  private updateRenderText() {
-    const confirmationText = this.isConfirming 
-      ? `\n确认中: ${this.confirmations}/${this.requiredConfirmations}` 
-      : '';
-
-    this.body.render.text = {
-      content: `${formatEthAmount(this.tx.value)}\n${formatAddress(this.tx.from)} → ${formatAddress(this.tx.to || '')}${confirmationText}`,
-      color: '#ffffff',
-      size: 14,
-      family: 'Arial',
-    };
-  }
-
   /**
    * 更新方块状态
    */
@@ -122,45 +106,102 @@ export class Block {
   }
 
   /**
-   * 获取方块对应的交易哈希
+   * 获取交易哈希
    */
   public getTransactionHash(): string {
     return this.tx.hash;
   }
 
   /**
-   * 设置方块的移动速度
+   * 开始确认过程
    */
-  public setSpeed(speed: number) {
-    this.speed = Math.max(0.5, Math.min(5, speed));
-  }
-
-  public startConfirming() {
+  public startConfirming(): void {
     this.isConfirming = true;
-    this.updateRenderText();
   }
 
-  public addConfirmation() {
+  /**
+   * 添加一个确认
+   */
+  public addConfirmation(): void {
     this.confirmations++;
-    this.updateRenderText();
   }
 
+  /**
+   * 检查是否完全确认
+   */
   public isFullyConfirmed(): boolean {
-    return this.confirmations >= this.requiredConfirmations;
+    return this.confirmations >= 3; // 需要3个确认
   }
 
+  /**
+   * 淡出效果
+   * @returns 如果淡出完成返回true
+   */
   public fadeOut(): boolean {
-    if (this.opacity <= 0) return true;
-    
-    this.opacity -= this.fadeOutSpeed;
-    if (this.body.render) {
-      this.body.render.opacity = Math.max(0, this.opacity);
+    if (this.isFullyConfirmed()) {
+      // 计算新的缩放比例和透明度
+      this.opacity = Math.max(0, this.opacity - this.fadeSpeed);
+      const newScale = Math.max(0.1, this.currentScale - this.fadeSpeed);
+      
+      // 计算相对缩放比例
+      const scaleRatio = newScale / this.currentScale;
+      this.currentScale = newScale;
+      
+      // 更新渲染属性
+      this.body.render.opacity = this.opacity;
+      Matter.Body.scale(this.body, scaleRatio, scaleRatio);
+      
+      // 当透明度为0时完成淡出
+      return this.opacity <= 0;
     }
-    
     return false;
   }
 
-  public getPosition(): { x: number; y: number } {
-    return { x: this.body.position.x, y: this.body.position.y };
+  /**
+   * 获取方块位置
+   */
+  public getPosition(): { x: number, y: number } {
+    return {
+      x: this.body.position.x,
+      y: this.body.position.y
+    };
+  }
+
+  /**
+   * 获取交易详情
+   */
+  public getTransactionDetails(currentConfirmations: number): {
+    hash: string;
+    from: string;
+    to: string;
+    value: string;
+    gasPrice: string;
+    gasLimit: string;
+    confirmations: number;
+    progress: number;
+  } {
+    return {
+      hash: this.tx.hash,
+      from: this.tx.from,
+      to: this.tx.to || '',
+      value: ethers.formatEther(this.tx.value),
+      gasPrice: ethers.formatUnits(this.tx.gasPrice || 0, 'gwei'),
+      gasLimit: this.tx.gasLimit.toString(),
+      confirmations: currentConfirmations,
+      progress: Math.min(100, (currentConfirmations / 3) * 100), // 3个确认为100%
+    };
+  }
+
+  /**
+   * 获取方块的位置和尺寸
+   */
+  public getBounds(): { x: number; y: number; width: number; height: number } {
+    const { min, max } = this.body.bounds;
+    return {
+      x: min.x,
+      y: min.y,
+      width: max.x - min.x,
+      height: max.y - min.y
+    };
   }
 }

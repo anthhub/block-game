@@ -63,9 +63,18 @@ export class Engine {
     this.player = new Player(this.engine);
     this.blockManager = new BlockManager(this.engine);
     this.powerUpManager = new PowerUpManager(this.engine, this.powerUpIndicator);
-    
+
+    // 添加测试按钮
+    this.addTestButton();
+
+    // 创建交易信息提示框
+    this.createTooltip();
+
     // 创建地面
     this.createGround();
+    
+    // 设置事件监听器
+    this.setupEventListeners();
     
     // 创建物理引擎运行器
     this.runner = Matter.Runner.create();
@@ -186,5 +195,167 @@ export class Engine {
     Matter.Engine.clear(this.engine);
     this.blockManager.cleanup();
     this.powerUpManager.cleanup();
+  }
+
+  /**
+   * 添加测试按钮
+   */
+  private addTestButton(): void {
+    const button = document.createElement('button');
+    button.textContent = '测试区块确认';
+    button.style.position = 'fixed';
+    button.style.top = '10px';
+    button.style.right = '10px';
+    button.style.zIndex = '1000';
+    button.style.padding = '8px 16px';
+    button.style.backgroundColor = '#4CAF50';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.borderRadius = '4px';
+    button.style.cursor = 'pointer';
+    
+    button.addEventListener('click', () => {
+      this.blockManager.confirmLatestBlock();
+    });
+
+    document.body.appendChild(button);
+  }
+
+  /**
+   * 创建交易信息提示框
+   */
+  private createTooltip(): void {
+    const tooltip = document.createElement('div');
+    tooltip.id = 'tx-tooltip';
+    tooltip.style.cssText = `
+      position: fixed;
+      display: none;
+      background: linear-gradient(to bottom right, rgba(33, 33, 33, 0.95), rgba(25, 25, 25, 0.95));
+      color: white;
+      padding: 16px;
+      border-radius: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      max-width: 400px;
+      min-width: 300px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: opacity 0.2s ease-out;
+    `;
+
+    // 添加CSS动画
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .loading-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-left-color: currentColor;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 8px;
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(tooltip);
+  }
+
+  /**
+   * 设置事件监听器
+   */
+  private setupEventListeners(): void {
+    const canvas = this.render.canvas;
+    const tooltip = document.getElementById('tx-tooltip')!;
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mousePosition = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+
+      const hoveredBlock = this.blockManager.getBlockAtPosition(mousePosition);
+      
+      if (hoveredBlock) {
+        const { confirmations } = this.blockManager.getBlockConfirmationProgress(hoveredBlock);
+        const details = hoveredBlock.getTransactionDetails(confirmations);
+        
+        const progressColor = confirmations === 0 ? '#FFA726' : 
+                            confirmations < 3 ? '#29B6F6' : 
+                            '#4CAF50';
+        
+        tooltip.innerHTML = `
+          <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 600; color: white;">Transaction Details</div>
+            <div style="display: flex; align-items: center; color: ${progressColor}; font-size: 12px; font-weight: 500;">
+              ${confirmations < 3 ? '<div class="loading-spinner" style="border-left-color: ' + progressColor + '"></div>' : ''}
+              ${confirmations} of 3 confirmations
+            </div>
+          </div>
+
+          <div style="display: grid; gap: 12px;">
+            <div>
+              <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">Value</div>
+              <div style="font-weight: 500;">${details.value} ETH</div>
+            </div>
+            
+            <div>
+              <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">From</div>
+              <div style="font-family: monospace; word-break: break-all; opacity: 0.9;">${details.from}</div>
+            </div>
+            
+            <div>
+              <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">To</div>
+              <div style="font-family: monospace; word-break: break-all; opacity: 0.9;">${details.to}</div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">Gas Price</div>
+                <div>${details.gasPrice} Gwei</div>
+              </div>
+              <div>
+                <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">Gas Limit</div>
+                <div>${details.gasLimit}</div>
+              </div>
+            </div>
+
+            <div>
+              <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">Transaction Hash</div>
+              <div style="font-family: monospace; word-break: break-all; opacity: 0.9; font-size: 12px;">${details.hash}</div>
+            </div>
+          </div>
+        `;
+        
+        // 设置提示框位置
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${e.clientX + 16}px`;
+        tooltip.style.top = `${e.clientY + 16}px`;
+
+        // 确保提示框不会超出屏幕
+        const tooltipRect = tooltip.getBoundingClientRect();
+        if (tooltipRect.right > window.innerWidth) {
+          tooltip.style.left = `${e.clientX - tooltipRect.width - 16}px`;
+        }
+        if (tooltipRect.bottom > window.innerHeight) {
+          tooltip.style.top = `${e.clientY - tooltipRect.height - 16}px`;
+        }
+      } else {
+        tooltip.style.display = 'none';
+      }
+    });
+
+    // 当鼠标离开画布时隐藏提示框
+    canvas.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+    });
   }
 }
