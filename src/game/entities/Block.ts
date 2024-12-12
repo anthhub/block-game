@@ -127,6 +127,16 @@ export class Block {
   }
 
   /**
+   * 设置区块的确认数
+   */
+  public setConfirmations(count: number): void {
+    this.confirmations = count;
+    if (count >= 3) {
+      this.isConfirming = true;
+    }
+  }
+
+  /**
    * 检查是否完全确认
    */
   public isFullyConfirmed(): boolean {

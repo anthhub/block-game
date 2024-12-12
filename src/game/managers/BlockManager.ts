@@ -183,6 +183,8 @@ export class BlockManager {
       const latestBlock = this.blocks[this.blocks.length - 1];
       const txHash = latestBlock.getTransactionHash();
       this.confirmedTxs.set(txHash, 3); // 直接设置为3个确认
+      this.confirmationProgress.set(txHash, 3); // 同时更新确认进度
+      latestBlock.setConfirmations(3); // 直接设置区块的确认数
     }
   }
 
