@@ -64,12 +64,35 @@ export class Engine {
     this.blockManager = new BlockManager(this.engine);
     this.powerUpManager = new PowerUpManager(this.engine, this.powerUpIndicator);
     
+    // 创建地面
+    this.createGround();
+    
     // 创建物理引擎运行器
     this.runner = Matter.Runner.create();
     
     // 设置碰撞检测和开始游戏
     this.setupCollisions();
     this.start();
+  }
+
+  /**
+   * 创建地面
+   */
+  private createGround() {
+    const ground = Matter.Bodies.rectangle(
+      window.innerWidth / 2,
+      window.innerHeight,
+      window.innerWidth,
+      20,
+      {
+        isStatic: true,
+        label: 'ground',
+        render: {
+          fillStyle: '#666666'
+        }
+      }
+    );
+    Matter.World.add(this.engine.world, ground);
   }
 
   /**
@@ -97,6 +120,9 @@ export class Engine {
               otherBody.position.y,
               (otherBody.render as any).fillStyle
             );
+            if (this.gameState.lives <= 0) {
+              this.gameOver();
+            }
           } 
           // 处理与道具的碰撞
           else if (otherBody.label === 'powerup') {
@@ -140,11 +166,6 @@ export class Engine {
     this.player.update();
     this.blockManager.update();
     this.powerUpManager.update();
-    
-    // 检查游戏结束条件
-    if (this.gameState.lives <= 0) {
-      this.gameOver();
-    }
   }
 
   /**

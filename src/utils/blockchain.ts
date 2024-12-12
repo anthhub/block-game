@@ -31,3 +31,30 @@ export const getBlockColor = (tx: ethers.TransactionResponse): string => {
   }
   return GAME_CONFIG.BLOCK.COLORS.LOW_GAS;
 };
+
+/**
+ * 格式化以太坊地址，只显示前6位和后4位
+ * @param address 以太坊地址
+ * @returns 格式化后的地址
+ */
+export const formatAddress = (address: string): string => {
+  if (!address || address.length < 10) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
+
+/**
+ * 格式化ETH金额，保留4位小数
+ * @param value BigNumber或字符串形式的Wei金额
+ * @returns 格式化后的ETH金额字符串
+ */
+export const formatEthAmount = (value: ethers.BigNumberish): string => {
+  try {
+    const ethValue = ethers.formatEther(value);
+    const amount = parseFloat(ethValue);
+    if (amount === 0) return '0 ETH';
+    if (amount < 0.0001) return '< 0.0001 ETH';
+    return `${amount.toFixed(4)} ETH`;
+  } catch (error) {
+    return '0 ETH';
+  }
+};
