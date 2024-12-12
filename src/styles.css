@@ -1,0 +1,112 @@
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #1a1a1a;
+  font-family: 'Arial', sans-serif;
+}
+
+#game-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#game-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#hud {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  color: white;
+  font-size: 24px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 15px;
+  border-radius: 10px;
+  backdrop-filter: blur(5px);
+}
+
+#score, #lives {
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s;
+}
+
+#lives.damage {
+  transform: scale(1.2);
+  color: #ff4444;
+}
+
+.game-over {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  padding: 3rem;
+  border-radius: 15px;
+  text-align: center;
+  color: white;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, -40%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.game-over h2 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  color: #ff4444;
+  text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+}
+
+.game-over button {
+  background: linear-gradient(45deg, #4CAF50, #45a049);
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  color: white;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+.game-over button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.power-up-indicator {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 15px 25px;
+  border-radius: 25px;
+  color: #ffff00;
+  font-size: 18px;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
+  animation: glow 1.5s ease-in-out infinite alternate;
+  backdrop-filter: blur(5px);
+  border: 2px solid rgba(255, 255, 0, 0.3);
+  z-index: 1;
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 5px rgba(255, 255, 0, 0.5); }
+  to { box-shadow: 0 0 20px rgba(255, 255, 0, 0.8); }
+}
