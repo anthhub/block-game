@@ -26,7 +26,7 @@ export class Block {
   private fadeSpeed: number = 0.05;
   private isSelected: boolean = false;
   private originalColor: string;
-  private fadeOut: boolean = false;
+  private isFadingOut: boolean = false;
   /** 标记方块是否已被计分 */
   private isScored: boolean = false;
 
@@ -106,7 +106,7 @@ export class Block {
       }
     }
 
-    if (this.fadeOut && this.currentScale > 0) {
+    if (this.isFadingOut && this.currentScale > 0) {
       // 减小缩放和透明度
       this.currentScale = Math.max(0, this.currentScale - this.fadeSpeed);
       
@@ -179,7 +179,7 @@ export class Block {
    * @returns 如果淡出完成返回true
    */
   public fadeOut(): boolean {
-    if (!this.fadeOut) {
+    if (!this.isFadingOut) {
       this.startFadeOut();
       return false;
     }
@@ -189,21 +189,15 @@ export class Block {
   /**
    * 开始淡出效果
    */
-  public startFadeOut() {
-    if (!this.fadeOut) {
-      this.fadeOut = true;
-      this.currentScale = 1;
-      if (this.body.render) {
-        this.body.render.opacity = 1;
-      }
-    }
+  private startFadeOut() {
+    this.isFadingOut = true;
   }
 
   /**
    * 检查方块是否正在淡出
    */
   public isFading(): boolean {
-    return this.fadeOut;
+    return this.isFadingOut;
   }
 
   /**
