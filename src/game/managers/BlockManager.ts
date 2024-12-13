@@ -227,33 +227,65 @@ export class BlockManager {
    * 计算网络拥堵程度 (0-1)
    */
   private calculateCongestionLevel(): number {
-    // Gas价格范围：10-500 Gwei
-    const gasScore = Math.min(Math.max(this.networkState.gasPrice - 10, 0) / 490, 1);
+    const { NETWORK, MAX_GAS_PRICE, MAX_PENDING_TX } = GAME_CONFIG.PHYSICS.NETWORK;
+    
+    // Gas价格评分 (0-1)
+    const gasScore = Math.min(this.networkState.gasPrice / MAX_GAS_PRICE, 1);
 
-    // 待处理交易数量范围：0-5000
-    const pendingScore = Math.min(this.networkState.pendingTxCount / 5000, 1);
+    // 待处理交易评分 (0-1)
+    const pendingScore = Math.min(this.networkState.pendingTxCount / MAX_PENDING_TX, 1);
 
-    // 综合评分 (gas价格权重0.7，待处理交易权重0.3)
-    return gasScore * 0.7 + pendingScore * 0.3;
+    // 根据权重计算综合拥堵度
+    return gasScore * NETWORK.CONGESTION_WEIGHTS.GAS_PRICE + 
+           pendingScore * NETWORK.CONGESTION_WEIGHTS.PENDING_TX;
+  }
+
+  /**
+   * 更新物理引擎的重力
+   */
+  private updateGravity(congestionLevel: number) {
+    const { GRAVITY } = GAME_CONFIG.PHYSICS;
+    
+    // 根据拥堵程度计算重力
+    const gravity = GRAVITY.BASE + 
+      (congestionLevel * (GRAVITY.MAX - GRAVITY.MIN)) * GRAVITY.SCALE_FACTOR;
+
+    // 平滑过渡到新的重力值
+    const currentGravity = this.engine.world.gravity.y;
+    const smoothFactor = 0.1; // 平滑因子
+    
+    const newGravity = currentGravity + (gravity - currentGravity) * smoothFactor;
+    
+    // 更新物理引擎的重力
+    Matter.World.setGravity(this.engine.world, {
+      x: 0,
+      y: newGravity
+    });
   }
 
   /**
    * 根据网络拥堵程度调整游戏参数
    */
   private adjustGameParameters(congestionLevel: number) {
+    // 更新重力
+    this.updateGravity(congestionLevel);
+
     // 调整生成速度
-    this.baseSpawnInterval = 1000 - congestionLevel * 500; // 500-1000ms
+    const { SPAWN_INTERVAL } = GAME_CONFIG.BLOCK;
+    const baseInterval = SPAWN_INTERVAL.BASE - 
+      (congestionLevel * (SPAWN_INTERVAL.BASE - SPAWN_INTERVAL.MIN));
+    
+    // 添加随机变化
+    const variance = baseInterval * SPAWN_INTERVAL.VARIANCE;
+    this.nextSpawnInterval = baseInterval + (Math.random() * 2 - 1) * variance;
+    
+    // 确保在允许范围内
+    this.nextSpawnInterval = Math.max(
+      SPAWN_INTERVAL.MIN,
+      Math.min(this.nextSpawnInterval, SPAWN_INTERVAL.MAX)
+    );
 
-    // 调整下落速度
-    const minSpeed = 2;
-    const maxSpeed = 5;
-    const newSpeed = minSpeed + congestionLevel * (maxSpeed - minSpeed);
-    this.blocks.forEach(block => block.setSpeed(newSpeed));
-
-    // 调整难度系数
-    this.difficultyMultiplier = 1 + congestionLevel;
-
-    // 触发状态变化回调，更新音乐和视觉效果
+    // 触发状态变化回调
     if (this.onNetworkStateChange) {
       this.onNetworkStateChange({
         gasPrice: this.networkState.gasPrice,
