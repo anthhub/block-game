@@ -328,4 +328,11 @@ export class BlockManager {
     }
     return null;
   }
+
+  /**
+   * 获取指定 body 的区块
+   */
+  public getBlockByBody(body: Matter.Body): Block | null {
+    return this.blocks.find(block => block.body === body);
+  }
 }

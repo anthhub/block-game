@@ -306,13 +306,13 @@ export class Engine {
       display: none;
       background: linear-gradient(to bottom right, rgba(33, 33, 33, 0.95), rgba(25, 25, 25, 0.95));
       color: white;
-      padding: 16px;
+      padding: 14px;
       border-radius: 12px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 14px;
-      max-width: 400px;
-      min-width: 300px;
-      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      font-size: 13px;
+      max-width: 320px;
+      width: 100%;
+      box-shadow: 0 8px 16px -1px rgba(0, 0, 0, 0.2);
       z-index: 1000;
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -337,6 +337,68 @@ export class Engine {
         vertical-align: middle;
         margin-right: 8px;
       }
+      .block-explorer-link {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 12px;
+        margin-top: 12px;
+        background: rgba(41, 182, 246, 0.1);
+        color: #29B6F6;
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 12px;
+        transition: all 0.2s ease;
+      }
+      .block-explorer-link:hover {
+        background: rgba(41, 182, 246, 0.2);
+      }
+      .block-explorer-link svg {
+        width: 14px;
+        height: 14px;
+        margin-right: 6px;
+      }
+      #tx-tooltip {
+        max-width: 320px;
+        width: 100%;
+        padding: 14px;
+        background: #1E1E1E;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        position: fixed;
+        z-index: 1000;
+        display: none;
+        font-size: 13px;
+        color: #E0E0E0;
+      }
+      #tx-tooltip.pinned {
+        right: 24px;
+        top: 24px;
+        left: auto !important;
+      }
+      .tooltip-close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #9E9E9E;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+        z-index: 1;
+      }
+      .tooltip-close:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+      }
+      .tooltip-close svg {
+        width: 16px;
+        height: 16px;
+      }
     `;
     document.head.appendChild(style);
     document.body.appendChild(tooltip);
@@ -348,8 +410,57 @@ export class Engine {
   private setupEventListeners(): void {
     const canvas = this.render.canvas;
     const tooltip = document.getElementById('tx-tooltip')!;
+    let pinnedBlock: Matter.Body | null = null;
 
-    canvas.addEventListener('mousemove', (e) => {
+    const closeTooltip = () => {
+      if (pinnedBlock) {
+        // 恢复区块的原始渲染样式
+        const block = this.blockManager.getBlockByBody(pinnedBlock);
+        if (block) {
+          block.body.render.strokeStyle = 'transparent';
+          block.body.render.lineWidth = 0;
+        }
+      }
+      tooltip.style.display = 'none';
+      tooltip.classList.remove('pinned');
+      pinnedBlock = null;
+    };
+
+    // 高亮显示区块
+    const highlightBlock = (block: any) => {
+      block.body.render.strokeStyle = '#29B6F6';
+      block.body.render.lineWidth = 2;
+    };
+
+    // 添加关闭按钮到tooltip
+    const closeButton = document.createElement('div');
+    closeButton.className = 'tooltip-close';
+    closeButton.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+      </svg>
+    `;
+    
+    // 点击关闭按钮事件
+    closeButton.addEventListener('click', (e) => {
+      e.stopPropagation(); // 阻止事件冒泡
+      closeTooltip();
+    });
+
+    // 点击页面其他地方关闭tooltip
+    document.addEventListener('click', (e) => {
+      const clickedElement = e.target as HTMLElement;
+      if (!tooltip.contains(clickedElement) && tooltip.classList.contains('pinned')) {
+        closeTooltip();
+      }
+    });
+
+    // 阻止tooltip内部点击事件冒泡
+    tooltip.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    canvas.addEventListener('click', (e) => {
       const rect = canvas.getBoundingClientRect();
       const mousePosition = {
         x: e.clientX - rect.left,
@@ -359,57 +470,141 @@ export class Engine {
       const hoveredBlock = this.blockManager.getBlockAtPosition(mousePosition);
       
       if (hoveredBlock) {
-        const { confirmations } = this.blockManager.getBlockConfirmationProgress(hoveredBlock);
-        const details = hoveredBlock.getTransactionDetails(confirmations);
+        // 如果之前有其他高亮的区块，先恢复其样式
+        if (pinnedBlock) {
+          const oldBlock = this.blockManager.getBlockByBody(pinnedBlock);
+          if (oldBlock) {
+            oldBlock.body.render.strokeStyle = 'transparent';
+            oldBlock.body.render.lineWidth = 0;
+          }
+        }
         
-        const progressColor = confirmations === 0 ? '#FFA726' : 
-                            confirmations < 3 ? '#29B6F6' : 
-                            '#4CAF50';
-        
-        tooltip.innerHTML = `
-          <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-weight: 600; color: white;">Transaction Details</div>
+        pinnedBlock = hoveredBlock.body;
+        highlightBlock(hoveredBlock);
+        this.updateTooltip(hoveredBlock, e);
+        tooltip.classList.add('pinned');
+        e.stopPropagation();
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (tooltip.classList.contains('pinned')) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mousePosition = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+
+      const hoveredBlock = this.blockManager.getBlockAtPosition(mousePosition);
+      
+      if (hoveredBlock) {
+        this.updateTooltip(hoveredBlock, e);
+        // 只在悬停时添加较浅的边框
+        if (!pinnedBlock || pinnedBlock !== hoveredBlock.body) {
+          hoveredBlock.body.render.strokeStyle = 'rgba(41, 182, 246, 0.3)';
+          hoveredBlock.body.render.lineWidth = 1;
+        }
+      } else {
+        tooltip.style.display = 'none';
+        // 恢复所有非固定区块的样式
+        this.blockManager.blocks.forEach(block => {
+          if (block.body !== pinnedBlock) {
+            block.body.render.strokeStyle = 'transparent';
+            block.body.render.lineWidth = 0;
+          }
+        });
+      }
+    });
+
+    // 当鼠标离开画布时隐藏提示框（仅当未锚定时）
+    canvas.addEventListener('mouseleave', () => {
+      if (!tooltip.classList.contains('pinned')) {
+        tooltip.style.display = 'none';
+      }
+    });
+
+    // 更新tooltip内容的函数
+    this.updateTooltip = (block: any, e: MouseEvent) => {
+      const { confirmations } = this.blockManager.getBlockConfirmationProgress(block);
+      const details = block.getTransactionDetails(confirmations);
+      
+      const progressColor = confirmations === 0 ? '#FFA726' : 
+                          confirmations < 3 ? '#29B6F6' : 
+                          '#4CAF50';
+      
+      tooltip.innerHTML = `
+        <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div style="font-weight: 600; color: white; margin-bottom: 6px;">Transaction Details</div>
             <div style="display: flex; align-items: center; color: ${progressColor}; font-size: 12px; font-weight: 500;">
               ${confirmations < 3 ? '<div class="loading-spinner" style="border-left-color: ' + progressColor + '"></div>' : ''}
               ${confirmations} of 3 confirmations
             </div>
           </div>
+          <div class="tooltip-close">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </div>
+        </div>
 
-          <div style="display: grid; gap: 12px;">
+        <div style="display: grid; gap: 14px;">
+          <div>
+            <div style="color: #9E9E9E; font-size: 11px; margin-bottom: 4px;">Value</div>
+            <div style="font-weight: 500;">${details.value} ETH</div>
+          </div>
+          
+          <div>
+            <div style="color: #9E9E9E; font-size: 11px; margin-bottom: 4px;">From</div>
+            <div style="font-family: monospace; font-size: 12px; word-break: break-all; opacity: 0.9;">${details.from}</div>
+          </div>
+          
+          <div>
+            <div style="color: #9E9E9E; font-size: 11px; margin-bottom: 4px;">To</div>
+            <div style="font-family: monospace; font-size: 12px; word-break: break-all; opacity: 0.9;">${details.to}</div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
             <div>
-              <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">Value</div>
-              <div style="font-weight: 500;">${details.value} ETH</div>
+              <div style="color: #9E9E9E; font-size: 11px; margin-bottom: 4px;">Gas Price</div>
+              <div>${details.gasPrice} Gwei</div>
             </div>
-            
             <div>
-              <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">From</div>
-              <div style="font-family: monospace; word-break: break-all; opacity: 0.9;">${details.from}</div>
+              <div style="color: #9E9E9E; font-size: 11px; margin-bottom: 4px;">Gas Limit</div>
+              <div>${details.gasLimit}</div>
             </div>
-            
-            <div>
-              <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">To</div>
-              <div style="font-family: monospace; word-break: break-all; opacity: 0.9;">${details.to}</div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-              <div>
-                <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">Gas Price</div>
-                <div>${details.gasPrice} Gwei</div>
-              </div>
-              <div>
-                <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">Gas Limit</div>
-                <div>${details.gasLimit}</div>
-              </div>
-            </div>
+          </div>
 
-            <div>
-              <div style="color: #9E9E9E; font-size: 12px; margin-bottom: 4px;">Transaction Hash</div>
-              <div style="font-family: monospace; word-break: break-all; opacity: 0.9; font-size: 12px;">${details.hash}</div>
-            </div>
-          `;
-        
-        // 设置提示框位置
-        tooltip.style.display = 'block';
+          <div>
+            <div style="color: #9E9E9E; font-size: 11px; margin-bottom: 4px;">Transaction Hash</div>
+            <div style="font-family: monospace; font-size: 12px; word-break: break-all; opacity: 0.9;">${details.hash}</div>
+          </div>
+
+          <a href="https://etherscan.io/tx/${details.hash}" 
+             target="_blank" 
+             rel="noopener noreferrer" 
+             class="block-explorer-link">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+            </svg>
+            View on Etherscan
+          </a>
+        </div>
+      `;
+
+      // 重新添加关闭按钮事件监听器
+      const newCloseButton = tooltip.querySelector('.tooltip-close') as HTMLElement;
+      if (newCloseButton) {
+        newCloseButton.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeTooltip();
+        });
+      }
+
+      tooltip.style.display = 'block';
+      
+      if (!tooltip.classList.contains('pinned')) {
         tooltip.style.left = `${e.clientX + 16}px`;
         tooltip.style.top = `${e.clientY + 16}px`;
 
@@ -421,15 +616,8 @@ export class Engine {
         if (tooltipRect.bottom > window.innerHeight) {
           tooltip.style.top = `${e.clientY - tooltipRect.height - 16}px`;
         }
-      } else {
-        tooltip.style.display = 'none';
       }
-    });
-
-    // 当鼠标离开画布时隐藏提示框
-    canvas.addEventListener('mouseleave', () => {
-      tooltip.style.display = 'none';
-    });
+    };
   }
 
   /**
