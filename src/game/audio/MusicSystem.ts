@@ -13,13 +13,33 @@ export class MusicSystem {
   private transitionSpeed: number = 0.01;
   private isInitialized: boolean = false;
 
+  // 预加载所有音效
+  private sfx = {
+    collision: new Howl({
+      src: [AUDIO_CONFIG.SFX.COLLISION],
+      volume: 0.3,
+      preload: true
+    }),
+    powerUp: new Howl({
+      src: [AUDIO_CONFIG.SFX.POWER_UP],
+      volume: 0.4,
+      preload: true
+    }),
+    blockConfirm: new Howl({
+      src: [AUDIO_CONFIG.SFX.BLOCK_CONFIRM],
+      volume: 0.3,
+      preload: true
+    })
+  };
+
   constructor() {
     // 基础音轨 - 平静的背景音乐
     this.baseTrack = new Howl({
       src: [AUDIO_CONFIG.MUSIC.BASE_TRACK.SRC],
       loop: true,
       volume: AUDIO_CONFIG.MUSIC.BASE_TRACK.INITIAL_VOLUME,
-      html5: true
+      html5: true,
+      preload: true
     });
 
     // 紧张音轨 - 随着网络拥堵程度增强
@@ -27,7 +47,32 @@ export class MusicSystem {
       src: [AUDIO_CONFIG.MUSIC.TENSION_TRACK.SRC],
       loop: true,
       volume: AUDIO_CONFIG.MUSIC.TENSION_TRACK.INITIAL_VOLUME,
-      html5: true
+      html5: true,
+      preload: true
+    });
+
+    // 开始预加载所有音频
+    this.preloadAll();
+  }
+
+  private preloadAll(): void {
+    const tracks = [this.baseTrack, this.tensionTrack, ...Object.values(this.sfx)];
+    let loadedCount = 0;
+
+    tracks.forEach(track => {
+      if (track.state() === 'loaded') {
+        loadedCount++;
+        if (loadedCount === tracks.length) {
+          console.log('All audio files loaded');
+        }
+      } else {
+        track.on('load', () => {
+          loadedCount++;
+          if (loadedCount === tracks.length) {
+            console.log('All audio files loaded');
+          }
+        });
+      }
     });
   }
 
@@ -36,13 +81,32 @@ export class MusicSystem {
    */
   public initialize(): void {
     if (this.isInitialized) return;
-    
-    this.baseTrack.play();
-    this.tensionTrack.play();
-    this.isInitialized = true;
 
-    // 启动音量过渡更新
+    // 确保基础音轨已加载
+    if (this.baseTrack.state() === 'loaded') {
+      this.startMusic();
+    } else {
+      this.baseTrack.on('load', () => {
+        this.startMusic();
+      });
+    }
+  }
+
+  private startMusic(): void {
+    if (this.isInitialized) return;
+    
+    // 播放音乐
+    const baseId = this.baseTrack.play();
+    const tensionId = this.tensionTrack.play();
+    
+    // 设置初始音量
+    this.baseTrack.volume(AUDIO_CONFIG.MUSIC.BASE_TRACK.INITIAL_VOLUME, baseId);
+    this.tensionTrack.volume(AUDIO_CONFIG.MUSIC.TENSION_TRACK.INITIAL_VOLUME, tensionId);
+    
+    this.isInitialized = true;
     this.startVolumeTransition();
+    
+    console.log('Music started');
   }
 
   /**
@@ -50,6 +114,8 @@ export class MusicSystem {
    * @param congestionLevel - 网络拥堵程度 (0-1)
    */
   public updateMusicState(congestionLevel: number): void {
+    if (!this.isInitialized) return;
+
     // 调整基础音轨音量
     const baseVolume = AUDIO_CONFIG.MUSIC.BASE_TRACK.MAX_VOLUME - 
       (AUDIO_CONFIG.MUSIC.BASE_TRACK.MAX_VOLUME - AUDIO_CONFIG.MUSIC.BASE_TRACK.MIN_VOLUME) * congestionLevel;
@@ -91,29 +157,26 @@ export class MusicSystem {
    * 播放碰撞音效
    */
   public playCollisionSound(): void {
-    new Howl({
-      src: [AUDIO_CONFIG.SFX.COLLISION],
-      volume: 0.3
-    }).play();
+    if (this.sfx.collision.state() === 'loaded') {
+      this.sfx.collision.play();
+    }
   }
 
   /**
    * 播放道具音效
    */
   public playPowerUpSound(): void {
-    new Howl({
-      src: [AUDIO_CONFIG.SFX.POWER_UP],
-      volume: 0.4
-    }).play();
+    if (this.sfx.powerUp.state() === 'loaded') {
+      this.sfx.powerUp.play();
+    }
   }
 
   /**
    * 播放区块确认音效
    */
   public playBlockConfirmSound(): void {
-    new Howl({
-      src: [AUDIO_CONFIG.SFX.BLOCK_CONFIRM],
-      volume: 0.3
-    }).play();
+    if (this.sfx.blockConfirm.state() === 'loaded') {
+      this.sfx.blockConfirm.play();
+    }
   }
 }

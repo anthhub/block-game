@@ -48,6 +48,8 @@ export class Engine {
   constructor(gameState: GameState, hud: HUD) {
     this.gameState = gameState;
     this.hud = hud;
+    
+    // 初始化音乐系统
     this.musicSystem = new MusicSystem();
     
     // 创建物理引擎并设置重力
@@ -71,9 +73,6 @@ export class Engine {
     // 监听网络状态变化
     this.blockManager.setNetworkStateChangeCallback(this.onNetworkStateChange.bind(this));
 
-    // 添加测试按钮
-    this.addTestButton();
-
     // 创建交易信息提示框
     this.createTooltip();
 
@@ -89,12 +88,14 @@ export class Engine {
     // 设置碰撞检测和开始游戏
     this.setupCollisions();
 
-    // 添加音乐初始化按钮
-    this.addMusicButton();
-
     // 启动游戏
     Matter.Runner.run(this.runner, this.engine);
     Matter.Render.run(this.render);
+
+    // 等待一小段时间后开始音乐，确保所有资源都加载完成
+    setTimeout(() => {
+      this.musicSystem.initialize();
+    }, 1000);
   }
 
   /**
