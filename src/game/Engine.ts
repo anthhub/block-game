@@ -119,6 +119,12 @@ export class Engine {
 
     // 设置UI
     this.setupUI();
+
+    // 设置初始网络状态
+    this.updateNetworkStatus();
+    
+    // 定期更新网络状态
+    setInterval(() => this.updateNetworkStatus(), 3000);
   }
 
   private setupUI() {
@@ -175,6 +181,7 @@ export class Engine {
     gasPrice: number;
     pendingTxCount: number;
     congestionLevel: number;
+    blockchainGravity: number;
   }) {
     // 更新音乐状态
     this.musicSystem.updateMusicState(state.congestionLevel);
@@ -214,6 +221,7 @@ export class Engine {
       gasPrice: state.gasPrice,
       pendingTxCount: state.pendingTxCount,
       congestionLevel: state.congestionLevel,
+      blockchainGravity: state.blockchainGravity,
     });
   }
 
@@ -222,45 +230,49 @@ export class Engine {
    * 处理玩家与方块、道具的碰撞事件
    */
   private setupCollisions() {
-    Matter.Events.on(this.engine, 'collisionStart', (event) => {
-      event.pairs.forEach((pair) => {
+    Matter.Events.on(this.engine, 'collisionStart', event => {
+      event.pairs.forEach(pair => {
         const { bodyA, bodyB } = pair;
         const playerBody = this.player.body;
-        
+
         // 检查是否是玩家与方块的碰撞
-        if ((bodyA === playerBody || bodyB === playerBody) && 
-            (bodyA.label === 'block' || bodyB.label === 'block')) {
+        if (
+          (bodyA === playerBody || bodyB === playerBody) &&
+          (bodyA.label === 'block' || bodyB.label === 'block')
+        ) {
           const block = bodyA === playerBody ? bodyB : bodyA;
-          
+
           // 获取碰撞点
           const collision = pair.collision;
           const collisionPoint = collision.supports[0] || { x: 0, y: 0 };
-          
+
           // 计算碰撞点相对于玩家顶部的位置
           const playerTop = playerBody.bounds.min.y;
           const collisionYOffset = Math.abs(collisionPoint.y - playerTop);
-          
+
           // 计算碰撞的相对速度
           const relativeVelocity = {
             x: block.velocity.x - playerBody.velocity.x,
-            y: block.velocity.y - playerBody.velocity.y
+            y: block.velocity.y - playerBody.velocity.y,
           };
 
           // 检查方块是否在空中（通过检查是否有明显的下落速度）
           const minFallingSpeed = 2; // 最小下落速度阈值
           const isBlockFalling = block.velocity.y > minFallingSpeed;
-          
+
           // 只有当以下条件都满足时才减少生命值：
           // 1. 碰撞点在玩家顶部附近（允许小误差）
           // 2. 方块相对于玩家有向下的速度
           // 3. 方块的位置在玩家上方
           // 4. 方块正在下落（不是静止在地面上）
           const collisionThreshold = playerBody.bounds.max.y - playerBody.bounds.min.y * 0.2; // 玩家高度的20%作为阈值
-          
-          if (collisionYOffset < collisionThreshold && 
-              relativeVelocity.y > 0 && 
-              block.position.y < playerBody.position.y &&
-              isBlockFalling) {
+
+          if (
+            collisionYOffset < collisionThreshold &&
+            relativeVelocity.y > 0 &&
+            block.position.y < playerBody.position.y &&
+            isBlockFalling
+          ) {
             const gameState = useGameStore.getState();
             if (!gameState.isGameOver) {
               useGameStore.getState().decrementLives();
@@ -317,22 +329,22 @@ export class Engine {
    */
   public gameOver() {
     if (this.isGameOver) return;
-    
+
     this.isGameOver = true;
     useGameStore.getState().setGameOver();
-    
+
     // 停止游戏物理引擎和渲染
     Matter.Runner.stop(this.runner);
     Matter.Render.stop(this.render);
-    
+
     // 创建游戏结束特效
     const centerX = this.render.options.width! / 2;
     const centerY = this.render.options.height! / 2;
     this.particleSystem.createExplosion(centerX, centerY, '#ff0000', 50);
-    
+
     // 播放游戏结束音效
     this.musicSystem.playGameOverSound();
-    
+
     // 显示游戏结束画面
     this.hud.showGameOver();
   }
@@ -691,5 +703,24 @@ export class Engine {
       { isStatic: true }
     );
     Matter.Composite.add(this.engine.world, ground);
+  }
+
+  /**
+   * 更新网络状态
+   */
+  private async updateNetworkStatus() {
+    try {
+      // 模拟网络状态数据
+      const mockNetworkStatus = {
+        gasPrice: Math.random() * 100 + 20,
+        pendingTxCount: Math.floor(Math.random() * 200),
+        congestionLevel: Math.random(),
+        blockchainGravity: Math.random()  // 添加区块链重力数据
+      };
+
+      this.hud.updateNetworkStatus(mockNetworkStatus);
+    } catch (error) {
+      console.error('Failed to update network status:', error);
+    }
   }
 }
