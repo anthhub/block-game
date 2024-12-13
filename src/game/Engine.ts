@@ -127,31 +127,29 @@ export class Engine {
 
     // 设置初始网络状态
     this.updateNetworkStatus();
-    
+
     // 定期更新网络状态
     setInterval(() => this.updateNetworkStatus(), 3000);
   }
 
   private setupUI() {
     // 创建测试按钮
-    const testButton = document.createElement('button');
-    testButton.textContent = '测试黑洞效果';
-    testButton.style.position = 'fixed';
-    testButton.style.top = '10px';
-    testButton.style.right = '10px';
-    testButton.style.zIndex = '1000';
-    testButton.style.padding = '8px 16px';
-    testButton.style.backgroundColor = '#4CAF50';
-    testButton.style.color = 'white';
-    testButton.style.border = 'none';
-    testButton.style.borderRadius = '4px';
-    testButton.style.cursor = 'pointer';
-
-    testButton.addEventListener('click', () => {
-      this.blockManager.testBlackHoleEffect();
-    });
-
-    document.body.appendChild(testButton);
+    // const testButton = document.createElement('button');
+    // testButton.textContent = '测试黑洞效果';
+    // testButton.style.position = 'fixed';
+    // testButton.style.top = '10px';
+    // testButton.style.right = '10px';
+    // testButton.style.zIndex = '1000';
+    // testButton.style.padding = '8px 16px';
+    // testButton.style.backgroundColor = '#4CAF50';
+    // testButton.style.color = 'white';
+    // testButton.style.border = 'none';
+    // testButton.style.borderRadius = '4px';
+    // testButton.style.cursor = 'pointer';
+    // testButton.addEventListener('click', () => {
+    //   this.blockManager.testBlackHoleEffect();
+    // });
+    // document.body.appendChild(testButton);
   }
 
   /**
@@ -234,10 +232,11 @@ export class Engine {
    * 设置碰撞检测
    */
   private setupCollisions() {
-    Matter.Events.on(this.engine, 'collisionStart', (event) => {
-      event.pairs.forEach((pair) => {
+    Matter.Events.on(this.engine, 'collisionStart', event => {
+      event.pairs.forEach(pair => {
         const { bodyA, bodyB } = pair;
-        const playerBody = bodyA.label === 'player' ? bodyA : bodyB.label === 'player' ? bodyB : null;
+        const playerBody =
+          bodyA.label === 'player' ? bodyA : bodyB.label === 'player' ? bodyB : null;
         const otherBody = playerBody === bodyA ? bodyB : bodyA;
 
         if (!playerBody) return;
@@ -251,7 +250,7 @@ export class Engine {
           const isBlockAbovePlayer = otherBody.position.y < playerBody.position.y;
           const fallingSpeed = otherBody.velocity.y;
           const isBlockFallingFast = fallingSpeed > GAME_CONFIG.PHYSICS.MIN_FALLING_SPEED;
-          
+
           if (!this.player.getInvincible() && isBlockAbovePlayer && isBlockFallingFast) {
             useGameStore.getState().decrementLives();
             // 创建碰撞特效
@@ -716,7 +715,7 @@ export class Engine {
         gasPrice: Math.random() * 100 + 20,
         pendingTxCount: Math.floor(Math.random() * 200),
         congestionLevel: Math.random(),
-        blockchainGravity: Math.random()  // 添加区块链重力数据
+        blockchainGravity: Math.random(), // 添加区块链重力数据
       };
 
       this.hud.updateNetworkStatus(mockNetworkStatus);
