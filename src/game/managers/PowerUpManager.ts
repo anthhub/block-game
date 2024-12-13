@@ -18,10 +18,14 @@ export class PowerUpManager {
   private activeEffects: PowerUpEffect[] = [];
   /** 道具状态指示器 */
   private powerUpIndicator: PowerUpIndicator;
+  private player: any; // player对象
+  private musicSystem: any; // 音乐系统对象
 
-  constructor(engine: Matter.Engine, powerUpIndicator: PowerUpIndicator) {
+  constructor(engine: Matter.Engine, powerUpIndicator: PowerUpIndicator, player: any, musicSystem: any) {
     this.engine = engine;
     this.powerUpIndicator = powerUpIndicator;
+    this.player = player;
+    this.musicSystem = musicSystem;
   }
 
   /**
@@ -38,10 +42,23 @@ export class PowerUpManager {
    * 根据配置的生成概率随机生成
    */
   public spawnPowerUp() {
+    // 如果当前道具数量已达到最大值，不再生成
+    if (this.powerUps.length >= GAME_CONFIG.POWER_UPS.MAX_POWER_UPS) {
+      return;
+    }
+
     if (Math.random() < GAME_CONFIG.POWER_UPS.SPAWN_CHANCE) {
       // 随机选择一个道具类型
       const type = Math.floor(Math.random() * Object.keys(PowerUpType).length / 2) as PowerUpType;
-      this.powerUps.push(new PowerUp(this.engine, type));
+      
+      // 在屏幕上方随机位置生成道具
+      const x = Math.random() * (window.innerWidth - 100) + 50; // 离边缘至少50像素
+      const y = 50; // 固定在屏幕上方50像素处
+      
+      const powerUp = new PowerUp(this.engine, type);
+      Matter.Body.setPosition(powerUp.body, { x, y });
+      
+      this.powerUps.push(powerUp);
     }
   }
 
@@ -50,8 +67,21 @@ export class PowerUpManager {
    * @param type - 道具类型
    */
   public applyPowerUp(type: PowerUpType) {
-    // 获取效果持续时间
-    const duration = GAME_CONFIG.POWER_UPS.DURATIONS[PowerUpType[type].toUpperCase()];
+    // 获取效果持续时间，根据道具类型获取对应的持续时间
+    let durationKey: string;
+    switch (type) {
+      case PowerUpType.LowGravity:
+        durationKey = 'LOW_GRAVITY';
+        break;
+      case PowerUpType.SmallSize:
+        durationKey = 'SMALL_SIZE';
+        break;
+      case PowerUpType.Invincibility:
+        durationKey = 'INVINCIBILITY';
+        break;
+    }
+    const duration = GAME_CONFIG.POWER_UPS.DURATIONS[durationKey];
+
     // 添加到活跃效果列表
     this.activeEffects.push({
       type,
@@ -59,7 +89,7 @@ export class PowerUpManager {
     });
 
     // 显示道具效果提示
-    this.powerUpIndicator.show(PowerUpType[type], duration);
+    this.powerUpIndicator.showEffect(PowerUpType[type], duration);
 
     // 应用具体效果
     switch (type) {
@@ -68,12 +98,31 @@ export class PowerUpManager {
         this.engine.gravity.y = GAME_CONFIG.PHYSICS.LOW_GRAVITY;
         break;
       case PowerUpType.SmallSize:
-        // TODO: 实现缩小效果
+        // 缩小玩家
+        Matter.Body.scale(this.player.body, 0.5, 0.5);
         break;
       case PowerUpType.Invincibility:
-        // TODO: 实现无敌效果
+        // 设置无敌状态
+        this.player.setInvincible(true);
         break;
     }
+
+    // 播放道具音效
+    this.musicSystem.playPowerUpSound();
+  }
+
+  /**
+   * 获取当前所有道具
+   */
+  public getPowerUps(): PowerUp[] {
+    return this.powerUps;
+  }
+
+  /**
+   * 获取当前所有道具
+   */
+  public getPowerUpsList(): PowerUp[] {
+    return this.powerUps;
   }
 
   /**
@@ -126,7 +175,14 @@ export class PowerUpManager {
         // 恢复正常重力
         this.engine.gravity.y = GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY;
         break;
-      // TODO: 处理其他效果的移除
+      case PowerUpType.SmallSize:
+        // 恢复正常大小
+        Matter.Body.scale(this.player.body, 2, 2); // 因为之前缩小了0.5，所以现在要放大2倍
+        break;
+      case PowerUpType.Invincibility:
+        // 关闭无敌状态
+        this.player.setInvincible(false);
+        break;
     }
   }
 

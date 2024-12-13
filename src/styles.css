@@ -110,3 +110,37 @@ body {
   from { box-shadow: 0 0 5px rgba(255, 255, 0, 0.5); }
   to { box-shadow: 0 0 20px rgba(255, 255, 0, 0.8); }
 }
+
+/* 道具指示器动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* 道具闪烁效果 */
+@keyframes powerUpGlow {
+  0% { box-shadow: 0 0 5px rgba(255, 255, 0, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(255, 255, 0, 0.8); }
+  100% { box-shadow: 0 0 5px rgba(255, 255, 0, 0.5); }
+}
+
+.power-up {
+  animation: powerUpGlow 1.5s ease-in-out infinite;
+}

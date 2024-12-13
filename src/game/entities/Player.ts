@@ -16,6 +16,10 @@ export class Player {
   private jumpForce: number = GAME_CONFIG.PLAYER.JUMP_FORCE;
   /** 物理引擎实例 */
   private engine: Matter.Engine;
+  /** 是否处于无敌状态 */
+  private isInvincible: boolean = false;
+  /** 无敌状态下的闪烁效果计时器 */
+  private invincibilityBlinkTimer: number = 0;
 
   /**
    * 创建玩家角色
@@ -147,6 +151,23 @@ export class Player {
   }
 
   /**
+   * 设置无敌状态
+   * @param invincible - 是否无敌
+   */
+  public setInvincible(invincible: boolean) {
+    this.isInvincible = invincible;
+    // 重置闪烁计时器
+    this.invincibilityBlinkTimer = 0;
+  }
+
+  /**
+   * 获取无敌状态
+   */
+  public getInvincible(): boolean {
+    return this.isInvincible;
+  }
+
+  /**
    * 更新玩家状态
    * - 检查是否在地面上
    * - 限制在屏幕范围内
@@ -174,6 +195,18 @@ export class Player {
         x: GAME_CONFIG.CANVAS.WIDTH - halfWidth,
         y: this.body.position.y
       });
+    }
+
+    // 无敌状态闪烁效果
+    if (this.isInvincible) {
+      this.invincibilityBlinkTimer += 1;
+      if (this.invincibilityBlinkTimer % 10 < 5) {
+        this.body.render.opacity = 0.5;
+      } else {
+        this.body.render.opacity = 1;
+      }
+    } else {
+      this.body.render.opacity = 1;
     }
   }
 }

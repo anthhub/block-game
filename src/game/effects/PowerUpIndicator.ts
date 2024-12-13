@@ -16,6 +16,7 @@ export class PowerUpIndicator {
     this.container.style.display = 'flex';
     this.container.style.flexDirection = 'column';
     this.container.style.gap = '10px';
+    this.container.style.zIndex = '1000';
     document.body.appendChild(this.container);
   }
 
@@ -34,31 +35,72 @@ export class PowerUpIndicator {
       indicator.style.padding = '8px 12px';
       indicator.style.borderRadius = '4px';
       indicator.style.fontSize = '14px';
+      indicator.style.display = 'flex';
+      indicator.style.alignItems = 'center';
+      indicator.style.gap = '8px';
+      indicator.style.animation = 'fadeIn 0.3s ease-in-out';
       this.container.appendChild(indicator);
       this.indicators.set(type, indicator);
     }
 
+    // 清除之前的定时器（如果存在）
+    if (indicator.timer) {
+      clearInterval(indicator.timer);
+    }
+
     const startTime = Date.now();
     const updateTimer = () => {
-      const remaining = duration - (Date.now() - startTime);
+      const remaining = Math.max(0, duration - (Date.now() - startTime));
+      
       if (remaining <= 0) {
-        indicator!.remove();
-        this.indicators.delete(type);
+        indicator!.style.animation = 'fadeOut 0.3s ease-in-out';
+        setTimeout(() => {
+          indicator!.remove();
+          this.indicators.delete(type);
+        }, 300);
+        clearInterval(indicator.timer);
         return;
       }
 
-      indicator!.textContent = `${type}: ${(remaining / 1000).toFixed(1)}s`;
-      requestAnimationFrame(updateTimer);
+      // 添加图标和中文说明
+      let icon = '';
+      let name = '';
+      switch (type) {
+        case 'LowGravity':
+          icon = '🪶';
+          name = '低重力';
+          break;
+        case 'SmallSize':
+          icon = '🔍';
+          name = '缩小';
+          break;
+        case 'Invincibility':
+          icon = '⭐';
+          name = '无敌';
+          break;
+      }
+
+      const seconds = (remaining / 1000).toFixed(1);
+      indicator!.innerHTML = `${icon} ${name}: ${seconds}秒`;
     };
 
+    // 立即更新一次
     updateTimer();
+    
+    // 每100ms更新一次
+    indicator.timer = setInterval(updateTimer, 100);
   }
 
   /**
    * 清除所有指示器
    */
   clear() {
-    this.indicators.forEach(indicator => indicator.remove());
+    this.indicators.forEach(indicator => {
+      if (indicator.timer) {
+        clearInterval(indicator.timer);
+      }
+      indicator.remove();
+    });
     this.indicators.clear();
   }
 

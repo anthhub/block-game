@@ -88,7 +88,12 @@ export class Engine {
     // 创建游戏组件
     this.particleSystem = new ParticleSystem(this.engine);
     this.powerUpIndicator = new PowerUpIndicator();
-    this.powerUpManager = new PowerUpManager(this.engine, this.powerUpIndicator);
+    this.powerUpManager = new PowerUpManager(
+      this.engine,
+      this.powerUpIndicator,
+      this.player,
+      this.musicSystem
+    );
 
     // 监听网络状态变化
     this.blockManager.setNetworkStateChangeCallback(this.onNetworkStateChange.bind(this));
@@ -227,58 +232,51 @@ export class Engine {
 
   /**
    * 设置碰撞检测
-   * 处理玩家与方块、道具的碰撞事件
    */
   private setupCollisions() {
-    Matter.Events.on(this.engine, 'collisionStart', event => {
-      event.pairs.forEach(pair => {
+    Matter.Events.on(this.engine, 'collisionStart', (event) => {
+      event.pairs.forEach((pair) => {
         const { bodyA, bodyB } = pair;
-        const playerBody = this.player.body;
+        const playerBody = bodyA.label === 'player' ? bodyA : bodyB.label === 'player' ? bodyB : null;
+        const otherBody = playerBody === bodyA ? bodyB : bodyA;
 
-        // 检查是否是玩家与方块的碰撞
-        if (
-          (bodyA === playerBody || bodyB === playerBody) &&
-          (bodyA.label === 'block' || bodyB.label === 'block')
-        ) {
-          const block = bodyA === playerBody ? bodyB : bodyA;
+        if (!playerBody) return;
 
-          // 获取碰撞点
-          const collision = pair.collision;
-          const collisionPoint = collision.supports[0] || { x: 0, y: 0 };
+        if (otherBody.label === 'block') {
+          // 获取对应的Block实例
+          const block = this.blockManager.getBlockByBody(otherBody);
+          if (!block) return;
 
-          // 计算碰撞点相对于玩家顶部的位置
-          const playerTop = playerBody.bounds.min.y;
-          const collisionYOffset = Math.abs(collisionPoint.y - playerTop);
-
-          // 计算碰撞的相对速度
-          const relativeVelocity = {
-            x: block.velocity.x - playerBody.velocity.x,
-            y: block.velocity.y - playerBody.velocity.y,
-          };
-
-          // 检查方块是否在空中（通过检查是否有明显的下落速度）
-          const minFallingSpeed = 2; // 最小下落速度阈值
-          const isBlockFalling = block.velocity.y > minFallingSpeed;
-
-          // 只有当以下条件都满足时才减少生命值：
-          // 1. 碰撞点在玩家顶部附近（允许小误差）
-          // 2. 方块相对于玩家有向下的速度
-          // 3. 方块的位置在玩家上方
-          // 4. 方块正在下落（不是静止在地面上）
-          const collisionThreshold = playerBody.bounds.max.y - playerBody.bounds.min.y * 0.2; // 玩家高度的20%作为阈值
-
-          if (
-            collisionYOffset < collisionThreshold &&
-            relativeVelocity.y > 0 &&
-            block.position.y < playerBody.position.y &&
-            isBlockFalling
-          ) {
-            const gameState = useGameStore.getState();
-            if (!gameState.isGameOver) {
-              useGameStore.getState().decrementLives();
-              this.particleSystem.createExplosion(playerBody.position.x, playerBody.position.y);
-              this.musicSystem.playCollisionSound();
+          // 只有当玩家不是无敌状态，且方块从上方高速砸下来时才扣生命值
+          const isBlockAbovePlayer = otherBody.position.y < playerBody.position.y;
+          const fallingSpeed = otherBody.velocity.y;
+          const isBlockFallingFast = fallingSpeed > GAME_CONFIG.PHYSICS.MIN_FALLING_SPEED;
+          
+          if (!this.player.getInvincible() && isBlockAbovePlayer && isBlockFallingFast) {
+            useGameStore.getState().decrementLives();
+            // 创建碰撞特效
+            this.particleSystem.createExplosion(
+              playerBody.position.x,
+              playerBody.position.y,
+              '#ff0000',
+              20
+            );
+            // 播放碰撞音效
+            this.musicSystem.playCollisionSound();
+          }
+        } else if (otherBody.label === 'powerup') {
+          // 获取并应用道具效果
+          const powerUp = this.powerUpManager.getPowerUpByBody(otherBody);
+          if (powerUp) {
+            this.powerUpManager.applyPowerUp(powerUp.type);
+            // 从数组中移除道具
+            const index = this.powerUpManager.getPowerUpsList().indexOf(powerUp);
+            if (index !== -1) {
+              this.powerUpManager.getPowerUpsList().splice(index, 1);
             }
+            powerUp.remove(this.engine);
+            // 立即尝试生成新的道具来维持数量
+            this.powerUpManager.spawnPowerUp();
           }
         }
       });
@@ -322,6 +320,9 @@ export class Engine {
     this.player.update();
     this.blockManager.update();
     this.powerUpManager.update();
+
+    // 更新所有道具的闪烁效果
+    this.powerUpManager.getPowerUps().forEach(powerUp => powerUp.update());
   }
 
   /**

@@ -29,11 +29,13 @@ export const GAME_CONFIG = {
       }
     },
     DEFAULT_GRAVITY: 0.5,
-    LOW_GRAVITY: 0.2
+    LOW_GRAVITY: 0.2,
+    MIN_FALLING_SPEED: 1, // 最小下落速度，低于这个速度不算碰撞
   },
   POWER_UPS: {
     SIZE: 15,
-    SPAWN_CHANCE: 0.001,
+    SPAWN_CHANCE: 0.8,
+    MAX_POWER_UPS: 2, // 改为最多2个道具
     DURATIONS: {
       LOW_GRAVITY: 5000,
       SMALL_SIZE: 3000,
