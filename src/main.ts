@@ -1,15 +1,18 @@
 import './styles.css';
 import { Engine } from './game/Engine';
-import { useGameStore } from './store/gameStore';
 import { HUD } from './components/HUD';
 
-const gameState = useGameStore.getState();
+// 创建 HUD
 const hud = new HUD();
-const game = new Engine(gameState, hud);
 
+// 创建游戏引擎
+const engine = new Engine(hud);
+
+// 游戏循环
 function gameLoop() {
-  game.update();
+  engine.update();
   requestAnimationFrame(gameLoop);
 }
 
+// 开始游戏循环
 gameLoop();

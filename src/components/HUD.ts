@@ -1,12 +1,10 @@
+import { useGameStore } from '../store/gameStore';
+
 /**
  * 游戏HUD（平视显示器）类
  * 负责显示游戏状态信息，如分数、生命值和游戏结束画面
  */
 export class HUD {
-  /** 当前分数 */
-  private score: number = 0;
-  /** 当前生命值 */
-  private lives: number = 3;
   /** 分数显示元素 */
   private scoreElement: HTMLElement;
   /** 生命值显示元素 */
@@ -22,6 +20,14 @@ export class HUD {
    */
   constructor() {
     this.createHUDElements();
+    
+    // 订阅游戏状态变化
+    useGameStore.subscribe(
+      state => {
+        this.updateScore(state.score);
+        this.updateLives(state.lives);
+      }
+    );
   }
 
   /**
@@ -34,20 +40,86 @@ export class HUD {
     hudContainer.style.left = '20px';
     hudContainer.style.zIndex = '1000';
     hudContainer.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    hudContainer.style.fontSize = '16px';
+    hudContainer.style.fontSize = '24px';
     hudContainer.style.color = '#ffffff';
-    hudContainer.style.textShadow = '0 2px 4px rgba(0,0,0,0.3)';
+    hudContainer.style.textShadow = '0 2px 4px rgba(0,0,0,0.5)';
 
     // 分数显示
     this.scoreElement = document.createElement('div');
     this.scoreElement.style.marginBottom = '10px';
-    this.updateScore(0);
     hudContainer.appendChild(this.scoreElement);
 
     // 生命值显示
     this.livesElement = document.createElement('div');
-    this.updateLives(3);
+    this.livesElement.style.display = 'flex';
+    this.livesElement.style.alignItems = 'center';
+    this.livesElement.style.gap = '5px';
     hudContainer.appendChild(this.livesElement);
+
+    // 游戏结束画面
+    this.gameOverElement = document.createElement('div');
+    this.gameOverElement.style.position = 'fixed';
+    this.gameOverElement.style.top = '0';
+    this.gameOverElement.style.left = '0';
+    this.gameOverElement.style.width = '100%';
+    this.gameOverElement.style.height = '100%';
+    this.gameOverElement.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    this.gameOverElement.style.display = 'none';
+    this.gameOverElement.style.justifyContent = 'center';
+    this.gameOverElement.style.alignItems = 'center';
+    this.gameOverElement.style.zIndex = '2000';
+    this.gameOverElement.style.flexDirection = 'column';
+
+    const gameOverText = document.createElement('div');
+    gameOverText.textContent = '游戏结束';
+    gameOverText.style.color = '#ffffff';
+    gameOverText.style.fontSize = '48px';
+    gameOverText.style.marginBottom = '20px';
+
+    const finalScore = document.createElement('div');
+    finalScore.style.color = '#ffffff';
+    finalScore.style.fontSize = '24px';
+    finalScore.style.marginBottom = '30px';
+
+    const restartButton = document.createElement('button');
+    restartButton.textContent = '重新开始';
+    restartButton.style.padding = '15px 30px';
+    restartButton.style.fontSize = '20px';
+    restartButton.style.backgroundColor = '#4CAF50';
+    restartButton.style.color = 'white';
+    restartButton.style.border = 'none';
+    restartButton.style.borderRadius = '5px';
+    restartButton.style.cursor = 'pointer';
+    restartButton.style.transition = 'background-color 0.3s';
+
+    restartButton.addEventListener('mouseover', () => {
+      restartButton.style.backgroundColor = '#45a049';
+    });
+
+    restartButton.addEventListener('mouseout', () => {
+      restartButton.style.backgroundColor = '#4CAF50';
+    });
+
+    restartButton.addEventListener('click', () => {
+      useGameStore.getState().resetGame();
+      this.hideGameOver();
+      location.reload(); // 重新加载页面以重置游戏状态
+    });
+
+    this.gameOverElement.appendChild(gameOverText);
+    this.gameOverElement.appendChild(finalScore);
+    this.gameOverElement.appendChild(restartButton);
+
+    // 订阅游戏状态变化
+    useGameStore.subscribe((state) => {
+      if (state.isGameOver) {
+        finalScore.textContent = `最终得分: ${state.score}`;
+        this.showGameOver();
+      }
+    });
+
+    document.body.appendChild(hudContainer);
+    document.body.appendChild(this.gameOverElement);
 
     // 网络状态显示
     this.networkStatusElement = document.createElement('div');
@@ -56,47 +128,68 @@ export class HUD {
     this.networkStatusElement.style.opacity = '0.8';
     hudContainer.appendChild(this.networkStatusElement);
 
-    // 游戏结束显示
-    this.gameOverElement = document.createElement('div');
-    this.gameOverElement.style.position = 'fixed';
-    this.gameOverElement.style.top = '50%';
-    this.gameOverElement.style.left = '50%';
-    this.gameOverElement.style.transform = 'translate(-50%, -50%)';
-    this.gameOverElement.style.textAlign = 'center';
-    this.gameOverElement.style.color = '#ffffff';
-    this.gameOverElement.style.fontSize = '32px';
-    this.gameOverElement.style.fontWeight = 'bold';
-    this.gameOverElement.style.textShadow = '0 2px 4px rgba(0,0,0,0.5)';
-    this.gameOverElement.style.display = 'none';
-    this.gameOverElement.style.zIndex = '2000';
+    // 初始化显示
+    const gameState = useGameStore.getState();
+    this.updateScore(gameState.score);
+    this.updateLives(gameState.lives);
+  }
 
-    document.body.appendChild(hudContainer);
-    document.body.appendChild(this.gameOverElement);
+  /**
+   * 显示游戏结束画面
+   */
+  private showGameOver() {
+    this.gameOverElement.style.display = 'flex';
+  }
+
+  /**
+   * 隐藏游戏结束画面
+   */
+  private hideGameOver() {
+    this.gameOverElement.style.display = 'none';
   }
 
   /**
    * 更新分数显示
-   * @param score - 当前分数
    */
   public updateScore(score: number) {
-    this.score = score;
     this.scoreElement.textContent = `分数: ${score}`;
   }
 
   /**
    * 更新生命值显示
-   * @param lives - 当前生命值
    */
   public updateLives(lives: number) {
-    this.lives = lives;
-    this.livesElement.textContent = `生命: ${lives}`;
+    this.livesElement.innerHTML = '';
+    const heartIcon = '❤️';
+    const emptyHeartIcon = '🖤';
+    const maxLives = 2;
+    
+    // 显示当前生命值
+    for (let i = 0; i < lives; i++) {
+      const heart = document.createElement('span');
+      heart.textContent = heartIcon;
+      heart.style.fontSize = '28px';
+      this.livesElement.appendChild(heart);
+    }
+    
+    // 显示失去的生命值
+    for (let i = lives; i < maxLives; i++) {
+      const heart = document.createElement('span');
+      heart.textContent = emptyHeartIcon;
+      heart.style.fontSize = '28px';
+      heart.style.opacity = '0.5';
+      this.livesElement.appendChild(heart);
+    }
   }
 
   /**
    * 更新网络状态显示
-   * @param state - 网络状态信息
    */
-  public updateNetworkStatus(state: { gasPrice: number, pendingTxCount: number, congestionLevel: number }) {
+  public updateNetworkStatus(state: {
+    gasPrice: number;
+    pendingTxCount: number;
+    congestionLevel: number;
+  }) {
     const congestionText = state.congestionLevel < 0.3 ? '流畅' :
                           state.congestionLevel < 0.7 ? '正常' : '拥堵';
     const congestionColor = state.congestionLevel < 0.3 ? '#4CAF50' :
@@ -114,14 +207,5 @@ export class HUD {
         <span style="color: ${congestionColor}; font-weight: 500;">${congestionText}</span>
       </div>
     `;
-  }
-
-  /**
-   * 显示游戏结束画面
-   * @param finalScore - 最终分数
-   */
-  public showGameOver(finalScore: number) {
-    this.gameOverElement.style.display = 'block';
-    this.gameOverElement.textContent = `Game Over\n最终分数: ${finalScore}`;
   }
 }

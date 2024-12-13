@@ -2,11 +2,12 @@ import Matter from 'matter-js';
 import { Player } from './entities/Player';
 import { BlockManager } from './managers/BlockManager';
 import { PowerUpManager } from './managers/PowerUpManager';
-import { GameState } from '../store/gameStore';
 import { ParticleSystem } from './effects/ParticleSystem';
-import { PowerUpIndicator } from './effects/PowerUpIndicator';
-import { HUD } from '../components/HUD';
 import { MusicSystem } from './audio/MusicSystem';
+import { HUD } from '../components/HUD';
+import { useGameStore } from '../store/gameStore';
+import { GameState } from '../store/gameStore';
+import { PowerUpIndicator } from './effects/PowerUpIndicator';
 import { GAME_CONFIG } from '../config/constants';
 import { createPhysicsEngine, createRenderer } from '../utils/physics';
 
@@ -28,8 +29,6 @@ export class Engine {
   /** 能力增强道具管理器 */
   private powerUpManager: PowerUpManager;
   /** 游戏状态管理器 */
-  private gameState: GameState;
-  /** HUD 显示器 */
   private hud: HUD;
   /** 粒子系统 */
   private particleSystem: ParticleSystem;
@@ -44,11 +43,9 @@ export class Engine {
 
   /**
    * 创建游戏引擎实例
-   * @param gameState - 游戏状态管理器
    * @param hud - HUD 显示器
    */
-  constructor(gameState: GameState, hud: HUD) {
-    this.gameState = gameState;
+  constructor(hud: HUD) {
     this.hud = hud;
 
     // 初始化音乐系统
@@ -138,11 +135,11 @@ export class Engine {
     testButton.style.border = 'none';
     testButton.style.borderRadius = '4px';
     testButton.style.cursor = 'pointer';
-    
+
     testButton.addEventListener('click', () => {
       this.blockManager.testBlackHoleEffect();
     });
-    
+
     document.body.appendChild(testButton);
   }
 
@@ -225,45 +222,50 @@ export class Engine {
    * 处理玩家与方块、道具的碰撞事件
    */
   private setupCollisions() {
-    Matter.Events.on(this.engine, 'collisionStart', event => {
-      event.pairs.forEach(pair => {
+    Matter.Events.on(this.engine, 'collisionStart', (event) => {
+      event.pairs.forEach((pair) => {
         const { bodyA, bodyB } = pair;
         const playerBody = this.player.body;
+        
+        // 检查是否是玩家与方块的碰撞
+        if ((bodyA === playerBody || bodyB === playerBody) && 
+            (bodyA.label === 'block' || bodyB.label === 'block')) {
+          const block = bodyA === playerBody ? bodyB : bodyA;
+          
+          // 获取碰撞点
+          const collision = pair.collision;
+          const collisionPoint = collision.supports[0] || { x: 0, y: 0 };
+          
+          // 计算碰撞点相对于玩家顶部的位置
+          const playerTop = playerBody.bounds.min.y;
+          const collisionYOffset = Math.abs(collisionPoint.y - playerTop);
+          
+          // 计算碰撞的相对速度
+          const relativeVelocity = {
+            x: block.velocity.x - playerBody.velocity.x,
+            y: block.velocity.y - playerBody.velocity.y
+          };
 
-        // 检查是否涉及玩家的碰撞
-        if (bodyA === playerBody || bodyB === playerBody) {
-          const otherBody = bodyA === playerBody ? bodyB : bodyA;
-
-          // 处理与方块的碰撞
-          if (otherBody.label === 'block') {
-            // 减少生命值并更新显示
-            this.gameState.decrementLives();
-            this.hud.updateLives(this.gameState.lives);
-            // 创建碰撞粒子效果
-            this.particleSystem.createExplosion(
-              otherBody.position.x,
-              otherBody.position.y,
-              (otherBody.render as any).fillStyle
-            );
-            // 播放碰撞音效
-            this.musicSystem.playCollisionSound();
-            if (this.gameState.lives <= 0) {
-              this.gameOver();
-            }
-          }
-          // 处理与道具的碰撞
-          else if (otherBody.label === 'powerup') {
-            const powerUp = this.powerUpManager.getPowerUpByBody(otherBody);
-            if (powerUp) {
-              // 应用道具效果并创建粒子效果
-              this.powerUpManager.applyPowerUp(powerUp.type);
-              this.particleSystem.createExplosion(
-                otherBody.position.x,
-                otherBody.position.y,
-                '#ffff00'
-              );
-              // 播放能量道具音效
-              this.musicSystem.playPowerUpSound();
+          // 检查方块是否在空中（通过检查是否有明显的下落速度）
+          const minFallingSpeed = 2; // 最小下落速度阈值
+          const isBlockFalling = block.velocity.y > minFallingSpeed;
+          
+          // 只有当以下条件都满足时才减少生命值：
+          // 1. 碰撞点在玩家顶部附近（允许小误差）
+          // 2. 方块相对于玩家有向下的速度
+          // 3. 方块的位置在玩家上方
+          // 4. 方块正在下落（不是静止在地面上）
+          const collisionThreshold = playerBody.bounds.max.y - playerBody.bounds.min.y * 0.2; // 玩家高度的20%作为阈值
+          
+          if (collisionYOffset < collisionThreshold && 
+              relativeVelocity.y > 0 && 
+              block.position.y < playerBody.position.y &&
+              isBlockFalling) {
+            const gameState = useGameStore.getState();
+            if (!gameState.isGameOver) {
+              useGameStore.getState().decrementLives();
+              this.particleSystem.createExplosion(playerBody.position.x, playerBody.position.y);
+              this.musicSystem.playCollisionSound();
             }
           }
         }
@@ -285,16 +287,14 @@ export class Engine {
    * 在每一帧调用，处理游戏逻辑
    */
   public update() {
-    if (this.isGameOver) return;
-
-    // 增加分数并更新显示
-    this.gameState.incrementScore();
-    this.hud.updateScore(this.gameState.score);
-
-    // 每100分播放一次区块确认音效
-    if (this.gameState.score % 100 === 0) {
-      this.musicSystem.playBlockConfirmSound();
+    const gameState = useGameStore.getState();
+    if (gameState.isGameOver) {
+      this.gameOver();
+      return;
     }
+
+    // 增加分数（基于存活时间）
+    useGameStore.getState().incrementScore();
 
     // 更新游戏组件
     this.player.update();
@@ -306,10 +306,25 @@ export class Engine {
    * 处理游戏结束
    */
   public gameOver() {
+    if (this.isGameOver) return;
+    
     this.isGameOver = true;
-    this.hud.showGameOver(this.gameState.score);
-    this.cleanup();
-    this.musicSystem.stop();
+    useGameStore.getState().setGameOver();
+    
+    // 停止游戏物理引擎和渲染
+    Matter.Runner.stop(this.runner);
+    Matter.Render.stop(this.render);
+    
+    // 创建游戏结束特效
+    const centerX = this.render.options.width! / 2;
+    const centerY = this.render.options.height! / 2;
+    this.particleSystem.createExplosion(centerX, centerY, '#ff0000', 50);
+    
+    // 播放游戏结束音效
+    this.musicSystem.playGameOverSound();
+    
+    // 显示游戏结束画面
+    this.hud.showGameOver();
   }
 
   /**
