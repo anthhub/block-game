@@ -392,6 +392,13 @@ export class BlockManager {
     }
   }
 
+  /**
+   * 获取所有方块
+   */
+  public getBlocks(): Block[] {
+    return this.blocks;
+  }
+
   public cleanup() {
     this.blocks.forEach(block => {
       Matter.World.remove(this.engine.world, block.body);

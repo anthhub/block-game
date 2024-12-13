@@ -293,8 +293,18 @@ export class Engine {
       return;
     }
 
-    // 增加分数（基于存活时间）
-    useGameStore.getState().incrementScore();
+    // 检查已经通过玩家但未计分的方块
+    const playerY = this.player.body.position.y;
+    this.blockManager.getBlocks().forEach(block => {
+      const blockY = block.getPosition().y;
+      // 如果方块已经通过玩家位置且还没有被计分
+      if (blockY > playerY && !block.isScored) {
+        // 增加分数（每个成功躲过的方块）
+        useGameStore.getState().incrementScore();
+        // 标记方块已计分
+        block.setScored(true);
+      }
+    });
 
     // 更新游戏组件
     this.player.update();

@@ -27,6 +27,8 @@ export class Block {
   private isSelected: boolean = false;
   private originalColor: string;
   private fadeOut: boolean = false;
+  /** 标记方块是否已被计分 */
+  private isScored: boolean = false;
 
   /**
    * 创建一个新的方块实例
@@ -302,5 +304,19 @@ export class Block {
     if (this.body.render) {
       this.body.render.fillStyle = this.originalColor;
     }
+  }
+
+  /**
+   * 设置方块是否已被计分
+   */
+  public setScored(scored: boolean) {
+    this.isScored = scored;
+  }
+
+  /**
+   * 获取方块是否已被计分
+   */
+  public getIsScored(): boolean {
+    return this.isScored;
   }
 }
