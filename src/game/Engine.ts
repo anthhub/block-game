@@ -72,7 +72,7 @@ export class Engine {
     this.blockManager = new BlockManager(this.engine);
     this.blockManager.setNetworkStateChangeCallback(this.onNetworkStateChange.bind(this));
     // 设置区块状态变化回调
-    this.blockManager.setBlockStatusChangeCallback((block) => {
+    this.blockManager.setBlockStatusChangeCallback(block => {
       const tooltip = document.getElementById('tooltip')!;
       if (tooltip.style.display === 'block') {
         const currentBlock = this.blockManager.getBlockByBody(this.pinnedBlock);
@@ -81,15 +81,9 @@ export class Engine {
           const rect = tooltip.getBoundingClientRect();
           const event = new MouseEvent('mousemove', {
             clientX: rect.left + rect.width / 2,
-            clientY: rect.top + rect.height / 2
+            clientY: rect.top + rect.height / 2,
           });
           this.updateTooltip(currentBlock, event);
-          
-          // 如果交易已确认，移除 pinned 状态
-          const status = this.blockManager.getBlockTransactionStatus(currentBlock);
-          if (status.status !== 'pending') {
-            tooltip.classList.remove('pinned');
-          }
         }
       }
     });
@@ -483,62 +477,71 @@ export class Engine {
     };
 
     canvas.addEventListener('mousemove', (e: MouseEvent) => {
-      const collision = Matter.Query.point(
-        this.engine.world.bodies,
-        { x: e.offsetX, y: e.offsetY }
-      )[0];
+      const collision = Matter.Query.point(this.engine.world.bodies, {
+        x: e.offsetX,
+        y: e.offsetY,
+      })[0];
+
+      // 如果提示框已经固定，不处理鼠标移动事件
+      if (tooltip.classList.contains('pinned')) {
+        return;
+      }
 
       if (collision && collision.label === 'block') {
         const block = this.blockManager.getBlockByBody(collision);
-        if (block && !tooltip.classList.contains('pinned')) {
+        if (block) {
           tooltip.style.display = 'block';
           this.updateTooltip(block, e);
           updateTooltipPosition(e);
         }
-      } else if (!tooltip.classList.contains('pinned')) {
+      } else {
         tooltip.style.display = 'none';
       }
     });
 
     canvas.addEventListener('click', async (e: MouseEvent) => {
-      const collision = Matter.Query.point(
-        this.engine.world.bodies,
-        { x: e.offsetX, y: e.offsetY }
-      )[0];
+      const collision = Matter.Query.point(this.engine.world.bodies, {
+        x: e.offsetX,
+        y: e.offsetY,
+      })[0];
 
       if (collision && collision.label === 'block') {
         const block = this.blockManager.getBlockByBody(collision);
         if (block) {
           // 清除之前选中的方块
           this.clearSelectedBlock();
-          
+
           // 设置新的选中方块
           this.selectedBlock = block;
           block.setSelected(true);
-          
-          // 固定提示框
+
+          // 固定提示框并设置位置
           tooltip.classList.add('pinned');
           this.pinnedBlock = collision;
-          
+
           // 立即更新交易状态
           await this.blockManager.updateBlockStatus(block);
           this.updateTooltip(block, e);
+          updateTooltipPosition(e);
         }
       } else {
+        // 点击非方块区域时关闭提示框
         closeTooltip();
       }
     });
 
     // 关闭按钮事件
-    const closeButton = tooltip.querySelector('.tooltip-close');
-    if (closeButton) {
-      closeButton.addEventListener('click', closeTooltip);
-    }
+    tooltip.addEventListener('click', (e: MouseEvent) => {
+      const closeButton = e.target as Element;
+      if (closeButton.closest('.tooltip-close')) {
+        closeTooltip();
+        e.stopPropagation();
+      }
+    });
 
-    // 点击其他地方关闭提示框
+    // 点击其他地方时关闭提示框
     document.addEventListener('click', (e: MouseEvent) => {
-      if (!tooltip.contains(e.target as Node) && 
-          !canvas.contains(e.target as Node)) {
+      if (!tooltip.contains(e.target as Node) && !canvas.contains(e.target as Node)) {
         closeTooltip();
       }
     });
