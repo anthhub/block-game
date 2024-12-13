@@ -19,8 +19,7 @@ export class BlockManager {
   private nextSpawnInterval: number = 1000; // 下一个方块的生成间隔
   private maxBufferSize: number = 20; // 交易缓冲区大小
   private difficultyMultiplier: number = 1; // 难度系数
-  private confirmedTxs: Map<string, number> = new Map(); // 存储交易哈希和确认数
-  private confirmationProgress: Map<string, number> = new Map(); // 存储交易哈希和确认进度
+  private txStatus: Map<string, number> = new Map(); // 存储交易哈希和状态 (1: 成功, 0: 失败, undefined: 待定)
   private particleSystem: ParticleSystem;
   private networkState = {
     gasPrice: 0,
@@ -28,7 +27,12 @@ export class BlockManager {
     lastUpdate: 0,
     updateInterval: 10000, // 每10秒更新一次网络状态
   };
-  private onNetworkStateChange?: (state: { gasPrice: number, pendingTxCount: number, congestionLevel: number }) => void;
+  private onNetworkStateChange?: (state: {
+    gasPrice: number;
+    pendingTxCount: number;
+    congestionLevel: number;
+  }) => void;
+  private onBlockStatusChange?: (block: Block) => void;
 
   constructor(engine: Matter.Engine) {
     this.engine = engine;
@@ -65,14 +69,34 @@ export class BlockManager {
 
       // 监听新区块
       this.provider.on('block', async (blockNumber: number) => {
+        console.log(`New block received: ${blockNumber}`);
         try {
-          const block = await this.provider.getBlock(blockNumber, true);
-          if (block && block.transactions) {
-            // 更新交易确认状态
-            for (const tx of block.transactions) {
-              const txHash = tx.hash;
-              const confirmations = this.confirmedTxs.get(txHash) || 0;
-              this.confirmedTxs.set(txHash, confirmations + 1);
+          // 更新所有现有区块的交易状态
+          for (const gameBlock of this.blocks) {
+            const txHash = gameBlock.getTransactionHash();
+            try {
+              const receipt = await this.provider.getTransactionReceipt(txHash);
+              if (receipt) {
+                const oldStatus = this.txStatus.get(txHash);
+                const newStatus = receipt.status;
+                
+                // 只在状态发生变化时更新和触发回调
+                if (oldStatus !== newStatus) {
+                  console.log(`Block ${txHash} status changed from ${oldStatus} to ${newStatus}`);
+                  this.txStatus.set(txHash, newStatus);
+                  
+                  // 获取确认数
+                  const currentBlock = await this.provider.getBlockNumber();
+                  const confirmations = receipt.blockNumber ? currentBlock - receipt.blockNumber + 1 : 0;
+                  gameBlock.setConfirmations(confirmations);
+                  
+                  if (this.onBlockStatusChange) {
+                    this.onBlockStatusChange(gameBlock);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error(`获取交易状态失败: ${txHash}`, error);
             }
           }
         } catch (error) {
@@ -81,6 +105,58 @@ export class BlockManager {
       });
     } catch (error) {
       console.error('设置区块链监听器失败:', error);
+    }
+  }
+
+  private async getTransactionStatus(txHash: string): Promise<number | undefined> {
+    try {
+      const receipt = await this.provider.getTransactionReceipt(txHash);
+      if (receipt) {
+        console.log(`Transaction ${txHash} receipt:`, receipt);
+        return receipt.status;
+      }
+      return undefined;
+    } catch (error) {
+      console.error(`获取交易状态失败: ${txHash}`, error);
+      return undefined;
+    }
+  }
+
+  private async updateBlockTransactionStatuses() {
+    const delay = 200; // 200ms delay between each transaction check
+    for (const [blockId, block] of Object.entries(this.blocks)) {
+      if (this.txStatus[block.txHash] === undefined) {
+        const status = await this.getTransactionStatus(block.txHash);
+        if (status !== undefined) {
+          this.txStatus[block.txHash] = status;
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  /**
+   * 立即更新指定方块的交易状态
+   */
+  public async updateBlockStatus(block: Block): Promise<void> {
+    try {
+      const hash = block.getTransactionHash();
+      if (!hash) return;
+
+      const receipt = await this.provider.getTransactionReceipt(hash);
+      const currentBlock = await this.provider.getBlockNumber();
+      
+      if (receipt) {
+        const confirmations = currentBlock - receipt.blockNumber + 1;
+        this.txStatus.set(hash, receipt.status);
+        
+        // 触发状态变化回调
+        if (this.onBlockStatusChange) {
+          this.onBlockStatusChange(block);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating block status:', error);
     }
   }
 
@@ -116,7 +192,7 @@ export class BlockManager {
           this.onNetworkStateChange({
             gasPrice: this.networkState.gasPrice,
             pendingTxCount: this.networkState.pendingTxCount,
-            congestionLevel
+            congestionLevel,
           });
         }
       } catch (error) {
@@ -126,7 +202,7 @@ export class BlockManager {
 
     // 立即更新一次
     await updateNetworkState();
-    
+
     // 定期更新
     setInterval(updateNetworkState, this.networkState.updateInterval);
   }
@@ -137,10 +213,10 @@ export class BlockManager {
   private calculateCongestionLevel(): number {
     // Gas价格范围：10-500 Gwei
     const gasScore = Math.min(Math.max(this.networkState.gasPrice - 10, 0) / 490, 1);
-    
+
     // 待处理交易数量范围：0-5000
     const pendingScore = Math.min(this.networkState.pendingTxCount / 5000, 1);
-    
+
     // 综合评分 (gas价格权重0.7，待处理交易权重0.3)
     return gasScore * 0.7 + pendingScore * 0.3;
   }
@@ -151,13 +227,13 @@ export class BlockManager {
   private adjustGameParameters(congestionLevel: number) {
     // 调整生成速度
     this.baseSpawnInterval = 1000 - congestionLevel * 500; // 500-1000ms
-    
+
     // 调整下落速度
     const minSpeed = 2;
     const maxSpeed = 5;
     const newSpeed = minSpeed + congestionLevel * (maxSpeed - minSpeed);
     this.blocks.forEach(block => block.setSpeed(newSpeed));
-    
+
     // 调整难度系数
     this.difficultyMultiplier = 1 + congestionLevel;
 
@@ -166,7 +242,7 @@ export class BlockManager {
       this.onNetworkStateChange({
         gasPrice: this.networkState.gasPrice,
         pendingTxCount: this.networkState.pendingTxCount,
-        congestionLevel
+        congestionLevel,
       });
     }
   }
@@ -174,8 +250,17 @@ export class BlockManager {
   /**
    * 设置网络状态变化回调
    */
-  public setNetworkStateChangeCallback(callback: (state: { gasPrice: number, pendingTxCount: number, congestionLevel: number }) => void) {
+  public setNetworkStateChangeCallback(
+    callback: (state: { gasPrice: number; pendingTxCount: number; congestionLevel: number }) => void
+  ) {
     this.onNetworkStateChange = callback;
+  }
+
+  /**
+   * 设置区块状态变化回调
+   */
+  public setBlockStatusChangeCallback(callback: (block: Block) => void) {
+    this.onBlockStatusChange = callback;
   }
 
   public update() {
@@ -200,35 +285,40 @@ export class BlockManager {
     // 更新和清理方块
     this.blocks = this.blocks.filter(block => {
       const txHash = block.getTransactionHash();
-      const confirmations = this.confirmedTxs.get(txHash) || 0;
+      const status = this.txStatus.get(txHash);
 
-      // 更新确认进度
-      if (confirmations > 0 && !block.isFullyConfirmed()) {
-        let progress = this.confirmationProgress.get(txHash) || 0;
-        progress = Math.min(confirmations, progress + 0.01); // 每帧增加0.01的进度
-        this.confirmationProgress.set(txHash, progress);
-
-        // 当进度达到整数时，增加确认数
-        if (Math.floor(progress) > confirmations) {
-          block.addConfirmation();
-        }
-      }
-
-      // 如果方块已完全确认，开始淡出效果
-      if (block.isFullyConfirmed()) {
+      // 如果交易已确认（有状态），触发爆炸效果
+      if (status !== undefined) {
         const pos = block.getPosition();
+        // 使用方块的原始颜色
+        const effectColor = block.body.render.fillStyle;
 
-        // 在淡出过程中持续创建小型爆炸效果
-        if (Math.random() < 0.3) { // 30%的概率生成粒子
-          this.particleSystem.createExplosion(pos.x, pos.y, block.body.render.fillStyle as string, 3);
+        // 设置确认数为最大值，触发淡出效果
+        block.setConfirmations(3);
+
+        // 创建持续的爆炸效果
+        for (let i = 0; i < 3; i++) {
+          this.particleSystem.createExplosion(
+            pos.x + (Math.random() - 0.5) * 20,
+            pos.y + (Math.random() - 0.5) * 20,
+            effectColor,
+            5 + Math.random() * 5
+          );
         }
 
+        // 如果区块完全淡出，移除它
         if (block.fadeOut()) {
-          // 如果淡出完成，创建最终爆炸效果并移除方块
-          this.particleSystem.createExplosion(pos.x, pos.y, block.body.render.fillStyle as string, 15);
+          // 创建最终的大爆炸效果
+          for (let i = 0; i < 8; i++) {
+            this.particleSystem.createExplosion(
+              pos.x + (Math.random() - 0.5) * 40,
+              pos.y + (Math.random() - 0.5) * 40,
+              effectColor,
+              10 + Math.random() * 10
+            );
+          }
           Matter.World.remove(this.engine.world, block.body);
-          this.confirmedTxs.delete(txHash);
-          this.confirmationProgress.delete(txHash);
+          this.txStatus.delete(txHash);
           return false;
         }
       }
@@ -236,8 +326,7 @@ export class BlockManager {
       // 如果方块超出屏幕，直接移除
       if (block.isOffScreen()) {
         Matter.World.remove(this.engine.world, block.body);
-        this.confirmedTxs.delete(txHash);
-        this.confirmationProgress.delete(txHash);
+        this.txStatus.delete(txHash);
         return false;
       }
 
@@ -251,8 +340,8 @@ export class BlockManager {
     }
 
     // 定期清理已确认交易集合
-    if (this.confirmedTxs.size > 1000) {
-      this.confirmedTxs.clear();
+    if (this.txStatus.size > 1000) {
+      this.txStatus.clear();
     }
   }
 
@@ -262,8 +351,7 @@ export class BlockManager {
     });
     this.blocks = [];
     this.txBuffer = [];
-    this.confirmedTxs.clear();
-    this.confirmationProgress.clear();
+    this.txStatus.clear();
     this.particleSystem.cleanup();
     this.provider.removeAllListeners();
   }
@@ -284,30 +372,27 @@ export class BlockManager {
     if (this.blocks.length > 0) {
       const latestBlock = this.blocks[this.blocks.length - 1];
       const txHash = latestBlock.getTransactionHash();
-      this.confirmedTxs.set(txHash, 3); // 直接设置为3个确认
-      this.confirmationProgress.set(txHash, 3); // 同时更新确认进度
-      latestBlock.setConfirmations(3); // 直接设置区块的确认数
+      this.txStatus.set(txHash, 1); // 直接设置为成功
     }
   }
 
   /**
-   * 获取指定区块的确认数
+   * 获取指定区块的交易状态
    */
-  public getBlockConfirmations(block: Block): number {
+  public getBlockTransactionStatus(block: Block): { status: 'pending' | 'success' | 'failed'; confirmations?: number } {
     const txHash = block.getTransactionHash();
-    return this.confirmedTxs.get(txHash) || 0;
-  }
+    const status = this.txStatus.get(txHash);
 
-  /**
-   * 获取指定区块的确认进度
-   */
-  public getBlockConfirmationProgress(block: Block): { confirmations: number; progress: number } {
-    const txHash = block.getTransactionHash();
-    const confirmations = this.confirmedTxs.get(txHash) || 0;
-    const progress = this.confirmationProgress.get(txHash) || confirmations;
+    if (status === undefined) {
+      return { status: 'pending' };
+    }
+
+    // 获取确认数
+    const confirmations = block.getConfirmations();
+    
     return {
-      confirmations,
-      progress: Math.min(100, (progress / 3) * 100)
+      status: status === 1 ? 'success' : 'failed',
+      confirmations: confirmations > 0 ? confirmations : undefined
     };
   }
 

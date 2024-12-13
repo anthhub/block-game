@@ -24,6 +24,7 @@ export class Block {
   private opacity: number = 1;
   private currentScale: number = 1;
   private fadeSpeed: number = 0.05;
+  private isSelected: boolean = false;
 
   /**
    * 创建一个新的方块实例
@@ -137,6 +138,13 @@ export class Block {
   }
 
   /**
+   * 获取确认数
+   */
+  public getConfirmations(): number {
+    return this.confirmations;
+  }
+
+  /**
    * 检查是否完全确认
    */
   public isFullyConfirmed(): boolean {
@@ -178,27 +186,30 @@ export class Block {
   }
 
   /**
+   * 获取原始交易对象
+   */
+  public getTransaction(): ethers.TransactionResponse {
+    return this.tx;
+  }
+
+  /**
    * 获取交易详情
    */
-  public getTransactionDetails(currentConfirmations: number): {
+  public getTransactionDetails(): {
     hash: string;
     from: string;
     to: string;
     value: string;
     gasPrice: string;
     gasLimit: string;
-    confirmations: number;
-    progress: number;
   } {
     return {
       hash: this.tx.hash,
       from: this.tx.from,
       to: this.tx.to || '',
       value: ethers.formatEther(this.tx.value),
-      gasPrice: ethers.formatUnits(this.tx.gasPrice || 0, 'gwei'),
+      gasPrice: ethers.formatUnits(this.tx.gasPrice || 0n, 'gwei'),
       gasLimit: this.tx.gasLimit.toString(),
-      confirmations: currentConfirmations,
-      progress: Math.min(100, (currentConfirmations / 3) * 100), // 3个确认为100%
     };
   }
 
@@ -220,5 +231,29 @@ export class Block {
    */
   public setSpeed(speed: number): void {
     this.speed = speed;
+  }
+
+  /**
+   * 设置选中状态
+   */
+  public setSelected(selected: boolean) {
+    this.isSelected = selected;
+    if (this.body.render) {
+      const render = this.body.render as any;
+      if (selected) {
+        render.strokeStyle = '#ffffff';
+        render.lineWidth = 2;
+      } else {
+        render.strokeStyle = 'transparent';
+        render.lineWidth = 0;
+      }
+    }
+  }
+
+  /**
+   * 获取选中状态
+   */
+  public isBlockSelected(): boolean {
+    return this.isSelected;
   }
 }
