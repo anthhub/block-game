@@ -119,6 +119,31 @@ export class Engine {
     setTimeout(() => {
       this.musicSystem.initialize();
     }, 1000);
+
+    // 设置UI
+    this.setupUI();
+  }
+
+  private setupUI() {
+    // 创建测试按钮
+    const testButton = document.createElement('button');
+    testButton.textContent = '测试黑洞效果';
+    testButton.style.position = 'fixed';
+    testButton.style.top = '10px';
+    testButton.style.right = '10px';
+    testButton.style.zIndex = '1000';
+    testButton.style.padding = '8px 16px';
+    testButton.style.backgroundColor = '#4CAF50';
+    testButton.style.color = 'white';
+    testButton.style.border = 'none';
+    testButton.style.borderRadius = '4px';
+    testButton.style.cursor = 'pointer';
+    
+    testButton.addEventListener('click', () => {
+      this.blockManager.testBlackHoleEffect();
+    });
+    
+    document.body.appendChild(testButton);
   }
 
   /**

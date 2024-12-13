@@ -25,6 +25,8 @@ export class Block {
   private currentScale: number = 1;
   private fadeSpeed: number = 0.05;
   private isSelected: boolean = false;
+  private originalColor: string;
+  private fadeOut: boolean = false;
 
   /**
    * 创建一个新的方块实例
@@ -33,6 +35,7 @@ export class Block {
    */
   constructor(engine: Matter.Engine, tx: ethers.TransactionResponse) {
     this.tx = tx;
+    this.originalColor = getBlockColor(tx);
     
     // 计算方块尺寸和位置
     const { width, height } = calculateBlockDimensions(tx);
@@ -42,7 +45,7 @@ export class Block {
     this.body = Matter.Bodies.rectangle(x, -height, width, height, {
       label: 'block',
       render: {
-        fillStyle: getBlockColor(tx),
+        fillStyle: this.originalColor,
         opacity: 1,
       },
       friction: 0.8,        // 增加摩擦力
@@ -90,11 +93,29 @@ export class Block {
    */
   public update() {
     if (!this.isLanded) {
-      // 只在未落地时更新位置
       Matter.Body.setPosition(this.body, {
         x: this.body.position.x,
         y: this.body.position.y + this.speed,
       });
+
+      // 检查是否已经落地
+      if (this.body.position.y >= window.innerHeight - 50) {
+        this.isLanded = true;
+      }
+    }
+
+    if (this.fadeOut && this.currentScale > 0) {
+      // 减小缩放和透明度
+      this.currentScale = Math.max(0, this.currentScale - this.fadeSpeed);
+      
+      // 更新渲染属性
+      if (this.body.render) {
+        this.body.render.opacity = this.currentScale;
+      }
+      
+      // 缩小方块
+      const scaleChange = 1 - this.fadeSpeed;
+      Matter.Body.scale(this.body, scaleChange, scaleChange);
     }
   }
 
@@ -156,23 +177,31 @@ export class Block {
    * @returns 如果淡出完成返回true
    */
   public fadeOut(): boolean {
-    if (this.isFullyConfirmed()) {
-      // 计算新的缩放比例和透明度
-      this.opacity = Math.max(0, this.opacity - this.fadeSpeed);
-      const newScale = Math.max(0.1, this.currentScale - this.fadeSpeed);
-      
-      // 计算相对缩放比例
-      const scaleRatio = newScale / this.currentScale;
-      this.currentScale = newScale;
-      
-      // 更新渲染属性
-      this.body.render.opacity = this.opacity;
-      Matter.Body.scale(this.body, scaleRatio, scaleRatio);
-      
-      // 当透明度为0时完成淡出
-      return this.opacity <= 0;
+    if (!this.fadeOut) {
+      this.startFadeOut();
+      return false;
     }
-    return false;
+    return this.currentScale <= 0;
+  }
+
+  /**
+   * 开始淡出效果
+   */
+  public startFadeOut() {
+    if (!this.fadeOut) {
+      this.fadeOut = true;
+      this.currentScale = 1;
+      if (this.body.render) {
+        this.body.render.opacity = 1;
+      }
+    }
+  }
+
+  /**
+   * 检查方块是否正在淡出
+   */
+  public isFading(): boolean {
+    return this.fadeOut;
   }
 
   /**
@@ -255,5 +284,23 @@ export class Block {
    */
   public isBlockSelected(): boolean {
     return this.isSelected;
+  }
+
+  /**
+   * 将方块变成黑色
+   */
+  public turnBlack() {
+    if (this.body.render) {
+      this.body.render.fillStyle = '#000000';
+    }
+  }
+
+  /**
+   * 恢复方块原来的颜色
+   */
+  public restoreColor() {
+    if (this.body.render) {
+      this.body.render.fillStyle = this.originalColor;
+    }
   }
 }

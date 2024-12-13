@@ -40,7 +40,6 @@ export class BlockManager {
     this.particleSystem = new ParticleSystem(engine);
     this.setupBlockchainListener();
     this.calculateNextSpawnInterval();
-    this.startNetworkMonitoring();
   }
 
   private calculateNextSpawnInterval() {
@@ -52,60 +51,36 @@ export class BlockManager {
   }
 
   private setupBlockchainListener() {
-    try {
-      // 监听待处理交易
-      this.provider.on('pending', async (txHash: string) => {
-        if (this.txBuffer.length < this.maxBufferSize) {
-          try {
-            const tx = await this.provider.getTransaction(txHash);
-            if (tx) {
-              this.txBuffer.push(tx);
-            }
-          } catch (error) {
-            // 静默处理错误，保持游戏流畅
-          }
+    // 监听新的pending交易
+    this.provider.on('pending', (tx) => {
+      this.provider.getTransaction(tx).then(transaction => {
+        if (transaction && this.txBuffer.length < this.maxBufferSize) {
+          this.txBuffer.push(transaction);
         }
       });
+    });
 
-      // 监听新区块
-      this.provider.on('block', async (blockNumber: number) => {
-        console.log(`New block received: ${blockNumber}`);
-        try {
-          // 更新所有现有区块的交易状态
-          for (const gameBlock of this.blocks) {
-            const txHash = gameBlock.getTransactionHash();
-            try {
-              const receipt = await this.provider.getTransactionReceipt(txHash);
-              if (receipt) {
-                const oldStatus = this.txStatus.get(txHash);
-                const newStatus = receipt.status;
-                
-                // 只在状态发生变化时更新和触发回调
-                if (oldStatus !== newStatus) {
-                  console.log(`Block ${txHash} status changed from ${oldStatus} to ${newStatus}`);
-                  this.txStatus.set(txHash, newStatus);
-                  
-                  // 获取确认数
-                  const currentBlock = await this.provider.getBlockNumber();
-                  const confirmations = receipt.blockNumber ? currentBlock - receipt.blockNumber + 1 : 0;
-                  gameBlock.setConfirmations(confirmations);
-                  
-                  if (this.onBlockStatusChange) {
-                    this.onBlockStatusChange(gameBlock);
-                  }
+    // 每隔一段时间获取pending交易
+    setInterval(() => {
+      this.provider.getBlock('pending').then(block => {
+        if (block && block.transactions.length > 0) {
+          // 随机选择一些交易添加到缓冲区
+          const availableSpace = this.maxBufferSize - this.txBuffer.length;
+          if (availableSpace > 0) {
+            const numToAdd = Math.min(availableSpace, 5);
+            for (let i = 0; i < numToAdd; i++) {
+              const randomIndex = Math.floor(Math.random() * block.transactions.length);
+              const txHash = block.transactions[randomIndex];
+              this.provider.getTransaction(txHash).then(transaction => {
+                if (transaction) {
+                  this.txBuffer.push(transaction);
                 }
-              }
-            } catch (error) {
-              console.error(`获取交易状态失败: ${txHash}`, error);
+              });
             }
           }
-        } catch (error) {
-          console.error('获取区块信息失败:', error);
         }
       });
-    } catch (error) {
-      console.error('设置区块链监听器失败:', error);
-    }
+    }, 5000);
   }
 
   private async getTransactionStatus(txHash: string): Promise<number | undefined> {
@@ -148,7 +123,13 @@ export class BlockManager {
       
       if (receipt) {
         const confirmations = currentBlock - receipt.blockNumber + 1;
+        const oldStatus = this.txStatus.get(hash);
         this.txStatus.set(hash, receipt.status);
+        
+        // 如果交易从pending变为失败，触发黑洞效果
+        if (oldStatus === undefined && receipt.status === 0) {
+          this.handleFailedTransaction(block);
+        }
         
         // 触发状态变化回调
         if (this.onBlockStatusChange) {
@@ -158,6 +139,41 @@ export class BlockManager {
     } catch (error) {
       console.error('Error updating block status:', error);
     }
+  }
+
+  private handleFailedTransaction(block: Block) {
+    // 如果方块已经在淡出，不处理
+    if (block.isFading()) return;
+
+    // 变黑
+    block.turnBlack();
+
+    // 获取周围的方块
+    const radius = 100;
+    const blockPos = block.body.position;
+    const nearbyBodies = Matter.Query.region(
+      this.engine.world.bodies,
+      {
+        min: { x: blockPos.x - radius, y: blockPos.y - radius },
+        max: { x: blockPos.x + radius, y: blockPos.y + radius }
+      }
+    );
+
+    // 找到周围未开始淡出的方块
+    const nearbyBlocks = nearbyBodies
+      .filter(body => body.label === 'block')
+      .map(body => this.getBlockByBody(body))
+      .filter(block => block !== null && !block.isFading());
+
+    // 延迟一小段时间后让所有方块消失
+    setTimeout(() => {
+      for (const nearbyBlock of nearbyBlocks) {
+        if (nearbyBlock) {
+          nearbyBlock.startFadeOut();
+        }
+      }
+      block.startFadeOut();
+    }, 300);
   }
 
   /**
@@ -266,8 +282,54 @@ export class BlockManager {
   public update() {
     const now = Date.now();
 
-    // 更新粒子系统
-    this.particleSystem.update();
+    // 更新所有方块
+    this.blocks.forEach(block => block.update());
+
+    // 更新和清理方块
+    this.blocks = this.blocks.filter(block => {
+      const txHash = block.getTransactionHash();
+      const status = this.txStatus.get(txHash);
+
+      // 如果交易已确认（有状态），触发爆炸效果
+      if (status !== undefined && !block.isFading()) {
+        const pos = block.getPosition();
+        // 使用方块的原始颜色
+        const effectColor = block.body.render.fillStyle;
+
+        // 创建持续的爆炸效果
+        for (let i = 0; i < 3; i++) {
+          this.particleSystem.createExplosion(
+            pos.x + (Math.random() - 0.5) * 20,
+            pos.y + (Math.random() - 0.5) * 20,
+            effectColor,
+            5 + Math.random() * 5
+          );
+        }
+
+        block.startFadeOut();
+        return true;
+      }
+
+      // 如果方块已经完全淡出，移除它
+      if (block.isFading() && block.body.render.opacity <= 0) {
+        Matter.World.remove(this.engine.world, block.body);
+        if (txHash) {
+          this.txStatus.delete(txHash);
+        }
+        return false;
+      }
+
+      // 如果方块超出屏幕，直接移除
+      if (block.isOffScreen()) {
+        Matter.World.remove(this.engine.world, block.body);
+        if (txHash) {
+          this.txStatus.delete(txHash);
+        }
+        return false;
+      }
+
+      return true;
+    });
 
     // 检查是否应该生成新方块
     if (now - this.lastSpawnTime >= this.nextSpawnInterval && this.txBuffer.length > 0) {
@@ -282,57 +344,8 @@ export class BlockManager {
       this.calculateNextSpawnInterval();
     }
 
-    // 更新和清理方块
-    this.blocks = this.blocks.filter(block => {
-      const txHash = block.getTransactionHash();
-      const status = this.txStatus.get(txHash);
-
-      // 如果交易已确认（有状态），触发爆炸效果
-      if (status !== undefined) {
-        const pos = block.getPosition();
-        // 使用方块的原始颜色
-        const effectColor = block.body.render.fillStyle;
-
-        // 设置确认数为最大值，触发淡出效果
-        block.setConfirmations(3);
-
-        // 创建持续的爆炸效果
-        for (let i = 0; i < 3; i++) {
-          this.particleSystem.createExplosion(
-            pos.x + (Math.random() - 0.5) * 20,
-            pos.y + (Math.random() - 0.5) * 20,
-            effectColor,
-            5 + Math.random() * 5
-          );
-        }
-
-        // 如果区块完全淡出，移除它
-        if (block.fadeOut()) {
-          // 创建最终的大爆炸效果
-          for (let i = 0; i < 8; i++) {
-            this.particleSystem.createExplosion(
-              pos.x + (Math.random() - 0.5) * 40,
-              pos.y + (Math.random() - 0.5) * 40,
-              effectColor,
-              10 + Math.random() * 10
-            );
-          }
-          Matter.World.remove(this.engine.world, block.body);
-          this.txStatus.delete(txHash);
-          return false;
-        }
-      }
-
-      // 如果方块超出屏幕，直接移除
-      if (block.isOffScreen()) {
-        Matter.World.remove(this.engine.world, block.body);
-        this.txStatus.delete(txHash);
-        return false;
-      }
-
-      block.update();
-      return true;
-    });
+    // 更新网络状态
+    void this.updateNetworkState();
 
     // 保持缓冲区大小在限制范围内
     if (this.txBuffer.length > this.maxBufferSize) {
@@ -342,6 +355,40 @@ export class BlockManager {
     // 定期清理已确认交易集合
     if (this.txStatus.size > 1000) {
       this.txStatus.clear();
+    }
+  }
+
+  private async updateNetworkState() {
+    const now = Date.now();
+    
+    // 每隔一段时间更新一次网络状态
+    if (now - this.networkState.lastUpdate >= this.networkState.updateInterval) {
+      try {
+        // 获取当前gas价格
+        const feeData = await this.provider.getFeeData();
+        if (feeData.gasPrice) {
+          this.networkState.gasPrice = Number(feeData.gasPrice);
+        }
+
+        // 获取pending交易数量
+        const block = await this.provider.getBlock('pending');
+        if (block) {
+          this.networkState.pendingTxCount = block.transactions.length;
+        }
+
+        this.networkState.lastUpdate = now;
+
+        // 触发回调
+        if (this.onNetworkStateChange) {
+          this.onNetworkStateChange({
+            gasPrice: this.networkState.gasPrice,
+            pendingTxCount: this.networkState.pendingTxCount,
+            congestionLevel: this.calculateCongestionLevel(),
+          });
+        }
+      } catch (error) {
+        console.error('更新网络状态失败:', error);
+      }
     }
   }
 
@@ -373,6 +420,18 @@ export class BlockManager {
       const latestBlock = this.blocks[this.blocks.length - 1];
       const txHash = latestBlock.getTransactionHash();
       this.txStatus.set(txHash, 1); // 直接设置为成功
+    }
+  }
+
+  /**
+   * 测试黑洞效果
+   */
+  public testBlackHoleEffect() {
+    // 随机选择一个方块
+    if (this.blocks.length > 0) {
+      const randomIndex = Math.floor(Math.random() * this.blocks.length);
+      const block = this.blocks[randomIndex];
+      this.handleFailedTransaction(block);
     }
   }
 
@@ -417,7 +476,7 @@ export class BlockManager {
   /**
    * 获取指定 body 的区块
    */
-  public getBlockByBody(body: Matter.Body): Block | null {
-    return this.blocks.find(block => block.body === body);
+  private getBlockByBody(body: Matter.Body): Block | null {
+    return this.blocks.find(block => block.body === body) || null;
   }
 }
