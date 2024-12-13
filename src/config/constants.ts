@@ -1,7 +1,7 @@
 export const GAME_CONFIG = {
   CANVAS: {
     WIDTH: 800,
-    HEIGHT: 600,
+    HEIGHT: window.innerHeight,
     BACKGROUND_COLOR: '#1a1a1a'
   },
   PLAYER: {

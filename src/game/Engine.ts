@@ -193,7 +193,7 @@ export class Engine {
               (otherBody.render as any).fillStyle
             );
             // 播放碰撞音效
-            this.musicSystem.playSound('collision');
+            this.musicSystem.playCollisionSound();
             if (this.gameState.lives <= 0) {
               this.gameOver();
             }
@@ -210,7 +210,7 @@ export class Engine {
                 '#ffff00'
               );
               // 播放能量道具音效
-              this.musicSystem.playSound('powerup');
+              this.musicSystem.playPowerUpSound();
             }
           }
         }
@@ -237,6 +237,11 @@ export class Engine {
     // 增加分数并更新显示
     this.gameState.incrementScore();
     this.hud.updateScore(this.gameState.score);
+    
+    // 每100分播放一次区块确认音效
+    if (this.gameState.score % 100 === 0) {
+      this.musicSystem.playBlockConfirmSound();
+    }
     
     // 更新游戏组件
     this.player.update();

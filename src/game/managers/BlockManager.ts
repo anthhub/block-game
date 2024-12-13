@@ -160,6 +160,15 @@ export class BlockManager {
     
     // 调整难度系数
     this.difficultyMultiplier = 1 + congestionLevel;
+
+    // 触发状态变化回调，更新音乐和视觉效果
+    if (this.onNetworkStateChange) {
+      this.onNetworkStateChange({
+        gasPrice: this.networkState.gasPrice,
+        pendingTxCount: this.networkState.pendingTxCount,
+        congestionLevel
+      });
+    }
   }
 
   /**
