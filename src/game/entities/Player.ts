@@ -1,5 +1,6 @@
 import Matter from 'matter-js';
 import { GAME_CONFIG } from '../../config/constants';
+import BlockManager from './BlockManager'; // Assuming BlockManager is in the same directory
 
 /**
  * 玩家角色类
@@ -20,13 +21,16 @@ export class Player {
   private isInvincible: boolean = false;
   /** 无敌状态下的闪烁效果计时器 */
   private invincibilityBlinkTimer: number = 0;
+  private blockManager: BlockManager;
 
   /**
    * 创建玩家角色
    * @param engine - Matter.js 物理引擎实例
+   * @param blockManager - BlockManager 实例
    */
-  constructor(engine: Matter.Engine) {
+  constructor(engine: Matter.Engine, blockManager: BlockManager) {
     this.engine = engine;
+    this.blockManager = blockManager;
 
     // 创建玩家物理体
     this.body = Matter.Bodies.rectangle(
@@ -174,7 +178,20 @@ export class Player {
       }
     });
 
-    window.addEventListener('touchend', () => {
+    window.addEventListener('touchend', (event) => {
+      const touch = event.changedTouches[0];
+      const collision = Matter.Query.point(this.engine.world.bodies, {
+        x: touch.clientX,
+        y: touch.clientY,
+      })[0];
+
+      if (collision && collision.label === 'block' && this.blockManager.getCanDestroyBlocks()) {
+        const block = this.blockManager.getBlockByBody(collision);
+        if (block) {
+          block.destroy();
+        }
+      }
+
       // 停止移动
       Matter.Body.setVelocity(this.body, {
         x: 0,

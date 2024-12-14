@@ -33,6 +33,7 @@ export class BlockManager {
     congestionLevel: number;
   }) => void;
   private onBlockStatusChange?: (block: Block) => void;
+  private canDestroyBlocks: boolean = false;
 
   constructor(engine: Matter.Engine) {
     this.engine = engine;
@@ -40,6 +41,7 @@ export class BlockManager {
     this.particleSystem = new ParticleSystem(engine);
     this.setupBlockchainListener();
     this.calculateNextSpawnInterval();
+    this.startRealtimeBlockchainEventListening();
   }
 
   private calculateNextSpawnInterval() {
@@ -83,6 +85,68 @@ export class BlockManager {
     }, 5000);
   }
 
+  private startRealtimeBlockchainEventListening() {
+    // 监听新的区块事件
+    this.provider.on('block', async blockNumber => {
+      try {
+        const block = await this.provider.getBlock(blockNumber);
+        if (block && block.transactions.length > 0) {
+          for (const txHash of block.transactions) {
+            const tx = await this.provider.getTransaction(txHash);
+            if (tx) {
+              const gasPrice = Number(tx.gasPrice) || 0;
+              const isUniswapTx = tx.data.startsWith('0x...'); // 假设Uniswap交易的函数签名
+              const isHighMEV = gasPrice > 300 * 1e9; // 假设高MEV交易的阈值
+
+              // Uniswap交易导致低重力
+              if (isUniswapTx) {
+                this.triggerLowGravity();
+              }
+
+              // 高MEV交易允许破坏方块
+              if (isHighMEV) {
+                this.enableBlockDestruction();
+              }
+
+              // 检测高gas价格交易并降低重力
+              if (gasPrice > 200 * 1e9) {
+                // 高于200 Gwei
+                // 临时降低重力
+                const originalGravity = GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY;
+                GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY *= 0.5;
+                setTimeout(() => {
+                  GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY = originalGravity;
+                }, 5000); // 5秒后恢复正常重力
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('区块事件处理失败:', error);
+      }
+    });
+  }
+
+  private triggerLowGravity() {
+    const originalGravity = GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY;
+    GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY *= 0.3; // 更低的重力
+    setTimeout(() => {
+      GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY = originalGravity;
+    }, 10000); // 10秒后恢复正常重力
+  }
+
+  private enableBlockDestruction() {
+    console.log('高MEV交易检测到：方块现在可以被破坏！');
+    this.canDestroyBlocks = true;
+    // 设置一个定时器在一段时间后禁用破坏功能
+    setTimeout(() => {
+      this.canDestroyBlocks = false;
+      console.log('方块破坏功能已禁用。');
+    }, 10000); // 10秒后禁用
+    // 添加逻辑允许玩家破坏方块，例如通过触摸事件
+    // 可以在玩家类中添加相应的处理逻辑
+  }
+
   private async getTransactionStatus(txHash: string): Promise<number | undefined> {
     try {
       const receipt = await this.provider.getTransactionReceipt(txHash);
@@ -114,7 +178,8 @@ export class BlockManager {
         this.txStatus.set(hash, receipt.status);
 
         // 如果交易从pending变为失败或者被Dropped，触发黑洞效果
-        if ((oldStatus === undefined && receipt.status === 0) || receipt.status === 2) {  // status 2 表示Dropped
+        if ((oldStatus === undefined && receipt.status === 0) || receipt.status === 2) {
+          // status 2 表示Dropped
           this.handleFailedTransaction(block);
         }
 
@@ -222,10 +287,7 @@ export class BlockManager {
     const pendingScore = Math.min(this.networkState.pendingTxCount / MAX_PENDING_TX, 1);
 
     // 根据权重计算综合拥堵度
-    return (
-      gasScore * CONGESTION_WEIGHTS.GAS_PRICE +
-      pendingScore * CONGESTION_WEIGHTS.PENDING_TX
-    );
+    return gasScore * CONGESTION_WEIGHTS.GAS_PRICE + pendingScore * CONGESTION_WEIGHTS.PENDING_TX;
   }
 
   /**
@@ -303,7 +365,10 @@ export class BlockManager {
     this.blocks.forEach(async block => {
       block.update();
       // 每隔一段时间更新一次交易状态
-      if (!block.isConfirmed() && now - block.getLastStatusUpdateTime() > GAME_CONFIG.BLOCK.STATUS_UPDATE_INTERVAL) {
+      if (
+        !block.isConfirmed() &&
+        now - block.getLastStatusUpdateTime() > GAME_CONFIG.BLOCK.STATUS_UPDATE_INTERVAL
+      ) {
         await this.updateBlockStatus(block);
       }
     });
@@ -360,7 +425,7 @@ export class BlockManager {
       const tx = this.txBuffer.splice(randomIndex, 1)[0];
 
       // 创建新方块
-      this.blocks.push(new Block(this.engine, tx));
+      this.blocks.push(new Block(this.engine, tx, this.engine.world));
 
       // 更新时间并计算下一个生成间隔
       this.lastSpawnTime = now;
@@ -511,5 +576,9 @@ export class BlockManager {
    */
   public getBlockByBody(body: Matter.Body): Block | null {
     return this.blocks.find(block => block.body === body) || null;
+  }
+
+  public getCanDestroyBlocks(): boolean {
+    return this.canDestroyBlocks;
   }
 }

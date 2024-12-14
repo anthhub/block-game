@@ -31,14 +31,17 @@ export class Block {
   /** 标记方块是否已被计分 */
   public isScored: boolean = false;
   private lastStatusUpdateTime: number = 0;
+  private world: Matter.World;
 
   /**
    * 创建一个新的方块实例
    * @param engine - Matter.js 物理引擎实例
    * @param tx - 关联的以太坊交易
+   * @param world - Matter.js 物理世界实例
    */
-  constructor(engine: Matter.Engine, tx: ethers.TransactionResponse) {
+  constructor(engine: Matter.Engine, tx: ethers.TransactionResponse, world: Matter.World) {
     this.tx = tx;
+    this.world = world;
     this.originalColor = getBlockColor(tx);
 
     // 计算方块的物理属性
@@ -354,5 +357,16 @@ export class Block {
    */
   public isConfirmed(): boolean {
     return this.confirmations > 0;
+  }
+
+  /**
+   * 破坏方块
+   */
+  public destroy(): void {
+    if (this.isLanded) {
+      // 从物理世界中移除方块
+      Matter.World.remove(this.world, this.body);
+      console.log('方块已被破坏！');
+    }
   }
 }

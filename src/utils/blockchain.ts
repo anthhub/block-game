@@ -283,6 +283,16 @@ export const calculateBlockPhysics = (tx: ethers.TransactionResponse): BlockPhys
   else if (isNFT) Object.assign(physicsSet, specialPhysics.nft);
   else if (isBigData) Object.assign(physicsSet, specialPhysics.bigData);
 
+  // 检测高gas价格交易并降低重力
+  if (isHighGas) {
+    // 临时降低重力
+    const originalGravity = GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY;
+    GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY *= 0.5;
+    setTimeout(() => {
+      GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY = originalGravity;
+    }, 5000); // 5秒后恢复正常重力
+  }
+
   return {
     size: baseSize,
     ...physicsSet,
