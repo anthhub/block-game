@@ -72,12 +72,13 @@ export class Engine {
       document.getElementById('game-canvas') as HTMLCanvasElement
     );
 
-    // 创建玩家
-    this.player = new Player(this.engine);
-
     // 创建区块管理器
     this.blockManager = new BlockManager(this.engine);
     this.blockManager.setNetworkStateChangeCallback(this.onNetworkStateChange.bind(this));
+    
+    // 创建玩家
+    this.player = new Player(this.engine, this.blockManager);
+
     // 设置区块状态变化回调
     this.blockManager.setBlockStatusChangeCallback(block => {
       const tooltip = document.getElementById('tooltip')!;

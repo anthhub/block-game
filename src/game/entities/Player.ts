@@ -1,6 +1,6 @@
 import Matter from 'matter-js';
 import { GAME_CONFIG } from '../../config/constants';
-import BlockManager from './BlockManager'; // Assuming BlockManager is in the same directory
+import { BlockManager } from '../managers/BlockManager';
 
 /**
  * 玩家角色类
@@ -34,18 +34,18 @@ export class Player {
 
     // 创建玩家物理体
     this.body = Matter.Bodies.rectangle(
-      GAME_CONFIG.CANVAS.WIDTH / 2,  // 屏幕中央
-      GAME_CONFIG.CANVAS.HEIGHT - 100,  // 距离底部100像素
+      GAME_CONFIG.CANVAS.WIDTH / 2, // 屏幕中央
+      GAME_CONFIG.CANVAS.HEIGHT - 100, // 距离底部100像素
       GAME_CONFIG.PLAYER.WIDTH,
       GAME_CONFIG.PLAYER.HEIGHT,
       {
         render: {
-          fillStyle: GAME_CONFIG.PLAYER.COLOR
+          fillStyle: GAME_CONFIG.PLAYER.COLOR,
         },
         label: 'player',
-        inertia: Infinity,  // 防止旋转
-        friction: 0.001,    // 很小的摩擦力
-        restitution: 0.1    // 很小的弹性
+        inertia: Infinity, // 防止旋转
+        friction: 0.001, // 很小的摩擦力
+        restitution: 0.1, // 很小的弹性
       }
     );
 
@@ -66,16 +66,16 @@ export class Player {
    * 设置碰撞检测
    */
   private setupCollisions() {
-    Matter.Events.on(this.engine, 'collisionStart', (event) => {
-      event.pairs.forEach((pair) => {
+    Matter.Events.on(this.engine, 'collisionStart', event => {
+      event.pairs.forEach(pair => {
         if (pair.bodyA === this.body || pair.bodyB === this.body) {
           // 检查碰撞的垂直分量
           const otherBody = pair.bodyA === this.body ? pair.bodyB : pair.bodyA;
           const relativeVelocity = {
             x: this.body.velocity.x - otherBody.velocity.x,
-            y: this.body.velocity.y - otherBody.velocity.y
+            y: this.body.velocity.y - otherBody.velocity.y,
           };
-          
+
           // 如果垂直速度向下，说明是从上方碰撞，可以跳跃
           if (relativeVelocity.y > 0) {
             this.isJumping = false;
@@ -84,11 +84,14 @@ export class Player {
       });
     });
 
-    Matter.Events.on(this.engine, 'collisionEnd', (event) => {
-      event.pairs.forEach((pair) => {
+    Matter.Events.on(this.engine, 'collisionEnd', event => {
+      event.pairs.forEach(pair => {
         if (pair.bodyA === this.body || pair.bodyB === this.body) {
           // 当离开碰撞物体时，检查是否还有其他碰撞
-          const collisions = Matter.Query.collides(this.body, Matter.Composite.allBodies(this.engine.world));
+          const collisions = Matter.Query.collides(
+            this.body,
+            Matter.Composite.allBodies(this.engine.world)
+          );
           if (collisions.length === 0) {
             this.isJumping = true;
           }
@@ -103,20 +106,20 @@ export class Player {
    * - 空格键/上方向键/W键：跳跃（需要在地面上）
    */
   private setupControls() {
-    window.addEventListener('keydown', (event) => {
+    window.addEventListener('keydown', event => {
       switch (event.code) {
         case 'ArrowLeft':
         case 'KeyA':
           Matter.Body.setVelocity(this.body, {
             x: -this.moveSpeed,
-            y: this.body.velocity.y
+            y: this.body.velocity.y,
           });
           break;
         case 'ArrowRight':
         case 'KeyD':
           Matter.Body.setVelocity(this.body, {
             x: this.moveSpeed,
-            y: this.body.velocity.y
+            y: this.body.velocity.y,
           });
           break;
         case 'Space':
@@ -128,7 +131,7 @@ export class Player {
     });
 
     // 停止移动
-    window.addEventListener('keyup', (event) => {
+    window.addEventListener('keyup', event => {
       switch (event.code) {
         case 'ArrowLeft':
         case 'KeyA':
@@ -136,7 +139,7 @@ export class Player {
         case 'KeyD':
           Matter.Body.setVelocity(this.body, {
             x: 0,
-            y: this.body.velocity.y
+            y: this.body.velocity.y,
           });
           break;
       }
@@ -152,33 +155,35 @@ export class Player {
     let startX: number = 0;
     let startY: number = 0;
 
-    window.addEventListener('touchstart', (event) => {
+    window.addEventListener('touchstart', event => {
       const touch = event.touches[0];
       startX = touch.clientX;
       startY = touch.clientY;
     });
 
-    window.addEventListener('touchmove', (event) => {
+    window.addEventListener('touchmove', event => {
       const touch = event.touches[0];
       const deltaX = touch.clientX - startX;
       const deltaY = touch.clientY - startY;
 
       // 水平滑动控制移动
-      if (Math.abs(deltaX) > 30) { // 设定一个滑动阈值
+      if (Math.abs(deltaX) > 30) {
+        // 设定一个滑动阈值
         const direction = deltaX > 0 ? 1 : -1;
         Matter.Body.setVelocity(this.body, {
           x: direction * this.moveSpeed,
-          y: this.body.velocity.y
+          y: this.body.velocity.y,
         });
       }
 
       // 垂直滑动控制跳跃
-      if (deltaY < -30) { // 向上滑动
+      if (deltaY < -30) {
+        // 向上滑动
         this.jump();
       }
     });
 
-    window.addEventListener('touchend', (event) => {
+    window.addEventListener('touchend', event => {
       const touch = event.changedTouches[0];
       const collision = Matter.Query.point(this.engine.world.bodies, {
         x: touch.clientX,
@@ -195,7 +200,7 @@ export class Player {
       // 停止移动
       Matter.Body.setVelocity(this.body, {
         x: 0,
-        y: this.body.velocity.y
+        y: this.body.velocity.y,
       });
     });
   }
@@ -208,7 +213,7 @@ export class Player {
     if (!this.isJumping) {
       Matter.Body.setVelocity(this.body, {
         x: this.body.velocity.x,
-        y: this.jumpForce
+        y: this.jumpForce,
       });
       this.isJumping = true;
     }
@@ -242,7 +247,7 @@ export class Player {
     if (this.body.position.y >= groundLevel) {
       Matter.Body.setPosition(this.body, {
         x: this.body.position.x,
-        y: groundLevel
+        y: groundLevel,
       });
       this.isJumping = false;
     }
@@ -252,12 +257,12 @@ export class Player {
     if (this.body.position.x < halfWidth) {
       Matter.Body.setPosition(this.body, {
         x: halfWidth,
-        y: this.body.position.y
+        y: this.body.position.y,
       });
     } else if (this.body.position.x > GAME_CONFIG.CANVAS.WIDTH - halfWidth) {
       Matter.Body.setPosition(this.body, {
         x: GAME_CONFIG.CANVAS.WIDTH - halfWidth,
-        y: this.body.position.y
+        y: this.body.position.y,
       });
     }
 
