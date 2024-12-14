@@ -267,7 +267,7 @@ export class Engine {
           );
 
           // 只有当相对速度足够大时才播放碰撞音效
-          if (totalRelativeVelocity > 1) {
+          if (totalRelativeVelocity > 0.5) {
             this.musicSystem.playCollisionSound();
           }
 
