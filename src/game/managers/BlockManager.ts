@@ -4,7 +4,7 @@ import { Block } from '../entities/Block';
 import { createProvider } from '../../utils/blockchain';
 import { GAME_CONFIG } from '../../config/constants';
 import { ParticleSystem } from '../effects/ParticleSystem';
-import { MusicSystem } from '../effects/MusicSystem';
+import { MusicSystem } from '../audio/MusicSystem';
 
 /**
  * 管理游戏中所有的方块
