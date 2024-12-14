@@ -45,31 +45,6 @@ export class PowerUpManager {
   }
 
   /**
-   * 尝试生成新的道具
-   * 根据配置的生成概率随机生成
-   */
-  public spawnPowerUp() {
-    // 如果当前道具数量已达到最大值，不再生成
-    if (this.powerUps.length >= GAME_CONFIG.POWER_UPS.MAX_POWER_UPS) {
-      return;
-    }
-
-    if (Math.random() < GAME_CONFIG.POWER_UPS.SPAWN_CHANCE) {
-      // 随机选择一个道具类型
-      const type = Math.floor((Math.random() * Object.keys(PowerUpType).length) / 2) as PowerUpType;
-
-      // 在屏幕上方随机位置生成道具
-      const x = Math.random() * (window.innerWidth - 100) + 50; // 离边缘至少50像素
-      const y = 50; // 固定在屏幕上方50像素处
-
-      const powerUp = new PowerUp(this.engine, type);
-      Matter.Body.setPosition(powerUp.body, { x, y });
-
-      this.powerUps.push(powerUp);
-    }
-  }
-
-  /**
    * 应用道具效果
    * @param type - 道具类型
    */
@@ -139,16 +114,14 @@ export class PowerUpManager {
    * - 生成新道具
    */
   public update() {
-    this.updateEffects();
-    this.cleanupPowerUps();
+    this.updateAndCleanup();
     this.spawnPowerUp();
   }
 
   /**
-   * 更新所有活跃效果
-   * 移除已过期的效果
+   * 更新所有活跃效果和清理超出屏幕的道具
    */
-  private updateEffects() {
+  private updateAndCleanup() {
     const now = Date.now();
     this.activeEffects = this.activeEffects.filter(effect => {
       if (now > effect.expiresAt) {
@@ -157,12 +130,7 @@ export class PowerUpManager {
       }
       return true;
     });
-  }
 
-  /**
-   * 清理超出屏幕的道具
-   */
-  private cleanupPowerUps() {
     this.powerUps = this.powerUps.filter(powerUp => {
       if (isOutOfBounds(powerUp.body, window.innerHeight)) {
         powerUp.remove(this.engine);
@@ -170,6 +138,22 @@ export class PowerUpManager {
       }
       return true;
     });
+  }
+
+  /**
+   * 尝试生成新的道具
+   * 根据配置的生成概率随机生成
+   */
+  public spawnPowerUp() {
+    if (this.powerUps.length < GAME_CONFIG.POWER_UPS.MAX_POWER_UPS && Math.random() < GAME_CONFIG.POWER_UPS.SPAWN_CHANCE) {
+      const type = Math.floor((Math.random() * Object.keys(PowerUpType).length) / 2) as PowerUpType;
+      const x = Math.random() * (window.innerWidth - 100) + 50;
+      const y = 50;
+
+      const powerUp = new PowerUp(this.engine, type);
+      Matter.Body.setPosition(powerUp.body, { x, y });
+      this.powerUps.push(powerUp);
+    }
   }
 
   /**

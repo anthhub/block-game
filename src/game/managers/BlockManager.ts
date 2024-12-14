@@ -367,32 +367,23 @@ export class BlockManager {
   public async update() {
     const now = Date.now();
 
-    // 更新所有方块
     this.blocks.forEach(async block => {
       block.update();
-      // 每隔一段时间更新一次交易状态
-      if (
-        !block.isConfirmed() &&
-        now - block.getLastStatusUpdateTime() > GAME_CONFIG.BLOCK.STATUS_UPDATE_INTERVAL
-      ) {
+      if (!block.isConfirmed() && now - block.getLastStatusUpdateTime() > GAME_CONFIG.BLOCK.STATUS_UPDATE_INTERVAL) {
         await this.updateBlockStatus(block);
       }
     });
 
-    // 更新和清理方块
     this.blocks = this.blocks.filter(block => {
       const txHash = block.getTransactionHash();
       const status = this.txStatus.get(txHash);
 
-      // 如果交易已确认（有状态），触发爆炸效果
       if (status !== undefined && !block.isFading()) {
         this.musicSystem.playBlockConfirmSound();
 
         const pos = block.getPosition();
-        // 使用方块的原始颜色
         const effectColor = block.body.render.fillStyle;
 
-        // 创建持续的爆炸效果
         for (let i = 0; i < 3; i++) {
           this.particleSystem.createExplosion(
             pos.x + (Math.random() - 0.5) * 20,
@@ -406,7 +397,6 @@ export class BlockManager {
         return true;
       }
 
-      // 如果方块已经完全淡出，移除它
       if (block.isFading() && block.body.render.opacity <= 0) {
         Matter.World.remove(this.engine.world, block.body);
         if (txHash) {
@@ -415,7 +405,6 @@ export class BlockManager {
         return false;
       }
 
-      // 如果方块超出屏幕，直接移除
       if (block.isOffScreen()) {
         Matter.World.remove(this.engine.world, block.body);
         if (txHash) {
