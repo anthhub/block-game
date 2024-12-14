@@ -11,6 +11,7 @@ import { PowerUpIndicator } from './effects/PowerUpIndicator';
 import { GAME_CONFIG } from '../config/constants';
 import { createPhysicsEngine, createRenderer } from '../utils/physics';
 import { Block } from './entities/Block';
+import { BlockchainService } from '../services/BlockchainService';
 
 /**
  * 游戏主引擎类
@@ -41,6 +42,13 @@ export class Engine {
   private musicSystem: MusicSystem;
   private pinnedBlock: Matter.Body | null = null;
   private selectedBlock: Block | null = null;
+  private blockchainService: BlockchainService;
+  private networkState = {
+    gasPrice: 30,
+    pendingTxCount: 100,
+    congestionLevel: 0.5,
+    blockchainGravity: 0.65,
+  };
 
   /**
    * 创建游戏引擎实例
@@ -48,6 +56,7 @@ export class Engine {
    */
   constructor(hud: HUD) {
     this.hud = hud;
+    this.blockchainService = new BlockchainService();
 
     // 初始化音乐系统
     this.musicSystem = new MusicSystem();
@@ -708,17 +717,24 @@ export class Engine {
    */
   private async updateNetworkStatus() {
     try {
-      // 模拟网络状态数据
-      const mockNetworkStatus = {
-        gasPrice: Math.random() * 100 + 20,
-        pendingTxCount: Math.floor(Math.random() * 200),
-        congestionLevel: Math.random(),
-        blockchainGravity: Math.random(), // 添加区块链重力数据
-      };
-
-      this.hud.updateNetworkStatus(mockNetworkStatus);
+      // 从区块链获取实时数据
+      const networkStatus = await this.blockchainService.getNetworkStatus();
+      
+      // 更新游戏状态
+      this.networkState = networkStatus;
+      
+      // 更新HUD显示
+      this.hud.updateNetworkStatus(networkStatus);
+      
+      // 更新重力
+      this.engine.gravity.y = GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY * networkStatus.blockchainGravity;
+      
+      // 每10秒更新一次网络状态
+      setTimeout(() => this.updateNetworkStatus(), 10000);
     } catch (error) {
-      console.error('Failed to update network status:', error);
+      console.error('更新网络状态失败:', error);
+      // 出错时也要确保继续更新
+      setTimeout(() => this.updateNetworkStatus(), 10000);
     }
   }
 }
