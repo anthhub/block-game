@@ -339,12 +339,16 @@ export class Engine {
     }
 
     // 检查已经通过玩家但未计分的方块
-    const playerY = this.player.body.position.y;
+    const playerBounds = this.player.body.bounds;
+    const playerTopY = playerBounds.min.y; // 玩家最高点
+
     this.blockManager.getBlocks().forEach(block => {
-      const blockY = block.getPosition().y;
-      // 如果方块已经通过玩家位置且还没有被计分
-      if (blockY > playerY && !block.isScored) {
-        // 增加分数（每个成功躲过的方块）
+      const blockBounds = block.body.bounds;
+      const blockBottomY = blockBounds.max.y; // 方块最低点
+
+      // 如果方块的最低点低于玩家的最高点且还没有被计分
+      if (blockBottomY > playerTopY && !block.isScored) {
+        // 增加分数
         useGameStore.getState().incrementScore();
         // 标记方块已计分
         block.setScored(true);
