@@ -1,16 +1,7 @@
 {
-  "github": {
-    "silent": true
-  },
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "x-vercel-protection",
-          "value": "disable"
-        }
-      ]
+  "public": {
+    "analytics": {
+      "disabled": true
     }
-  ]
+  }
 }
