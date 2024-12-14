@@ -8,8 +8,12 @@ import { AUDIO_CONFIG } from '../../config/audio';
 export class MusicSystem {
   private baseTrack: Howl;
   private tensionTrack: Howl;
+  private ambientTrack: Howl;
+  private actionTrack: Howl;
   private currentTensionVolume: number = 0;
   private targetTensionVolume: number = 0;
+  private currentActionVolume: number = 0;
+  private targetActionVolume: number = 0;
   private transitionSpeed: number = 0.01;
   private isInitialized: boolean = false;
 
@@ -28,6 +32,31 @@ export class MusicSystem {
     blockConfirm: new Howl({
       src: [AUDIO_CONFIG.SFX.BLOCK_CONFIRM],
       volume: 0.3,
+      preload: true
+    }),
+    jump: new Howl({
+      src: [AUDIO_CONFIG.SFX.JUMP],
+      volume: 0.4,
+      preload: true
+    }),
+    gameOver: new Howl({
+      src: [AUDIO_CONFIG.SFX.GAME_OVER],
+      volume: 0.5,
+      preload: true
+    }),
+    death: new Howl({
+      src: [AUDIO_CONFIG.SFX.DEATH],
+      volume: 0.4,
+      preload: true
+    }),
+    levelUp: new Howl({
+      src: [AUDIO_CONFIG.SFX.LEVEL_UP],
+      volume: 0.5,
+      preload: true
+    }),
+    score: new Howl({
+      src: [AUDIO_CONFIG.SFX.SCORE],
+      volume: 0.4,
       preload: true
     })
   };
@@ -51,12 +80,36 @@ export class MusicSystem {
       preload: true
     });
 
+    // 环境音轨 - 提供氛围感
+    this.ambientTrack = new Howl({
+      src: [AUDIO_CONFIG.MUSIC.AMBIENT_TRACK.SRC],
+      loop: true,
+      volume: AUDIO_CONFIG.MUSIC.AMBIENT_TRACK.INITIAL_VOLUME,
+      html5: true,
+      preload: true
+    });
+
+    // 动作音轨 - 在特殊事件时增强
+    this.actionTrack = new Howl({
+      src: [AUDIO_CONFIG.MUSIC.ACTION_TRACK.SRC],
+      loop: true,
+      volume: AUDIO_CONFIG.MUSIC.ACTION_TRACK.INITIAL_VOLUME,
+      html5: true,
+      preload: true
+    });
+
     // 开始预加载所有音频
     this.preloadAll();
   }
 
   private preloadAll(): void {
-    const tracks = [this.baseTrack, this.tensionTrack, ...Object.values(this.sfx)];
+    const tracks = [
+      this.baseTrack, 
+      this.tensionTrack, 
+      this.ambientTrack, 
+      this.actionTrack,
+      ...Object.values(this.sfx)
+    ];
     let loadedCount = 0;
 
     tracks.forEach(track => {
@@ -95,13 +148,17 @@ export class MusicSystem {
   private startMusic(): void {
     if (this.isInitialized) return;
     
-    // 播放音乐
-    const baseId = this.baseTrack.play();
-    const tensionId = this.tensionTrack.play();
+    // 播放所有背景音轨
+    this.baseTrack.play();
+    this.tensionTrack.play();
+    this.ambientTrack.play();
+    this.actionTrack.play();
     
     // 设置初始音量
-    this.baseTrack.volume(AUDIO_CONFIG.MUSIC.BASE_TRACK.INITIAL_VOLUME, baseId);
-    this.tensionTrack.volume(AUDIO_CONFIG.MUSIC.TENSION_TRACK.INITIAL_VOLUME, tensionId);
+    this.baseTrack.volume(AUDIO_CONFIG.MUSIC.BASE_TRACK.INITIAL_VOLUME);
+    this.tensionTrack.volume(AUDIO_CONFIG.MUSIC.TENSION_TRACK.INITIAL_VOLUME);
+    this.ambientTrack.volume(AUDIO_CONFIG.MUSIC.AMBIENT_TRACK.INITIAL_VOLUME);
+    this.actionTrack.volume(AUDIO_CONFIG.MUSIC.ACTION_TRACK.INITIAL_VOLUME);
     
     this.isInitialized = true;
     this.startVolumeTransition();
@@ -127,6 +184,16 @@ export class MusicSystem {
   }
 
   /**
+   * 增强动作音轨（用于特殊事件）
+   */
+  public enhanceActionTrack(): void {
+    this.targetActionVolume = AUDIO_CONFIG.MUSIC.ACTION_TRACK.MAX_VOLUME;
+    setTimeout(() => {
+      this.targetActionVolume = AUDIO_CONFIG.MUSIC.ACTION_TRACK.MIN_VOLUME;
+    }, 5000); // 5秒后淡出
+  }
+
+  /**
    * 启动音量过渡更新
    */
   private startVolumeTransition(): void {
@@ -146,37 +213,73 @@ export class MusicSystem {
         );
       }
 
+      // 更新动作音轨音量
+      if (this.currentActionVolume < this.targetActionVolume) {
+        this.currentActionVolume = Math.min(
+          this.currentActionVolume + this.transitionSpeed,
+          this.targetActionVolume
+        );
+      } else if (this.currentActionVolume > this.targetActionVolume) {
+        this.currentActionVolume = Math.max(
+          this.currentActionVolume - this.transitionSpeed,
+          this.targetActionVolume
+        );
+      }
+
       this.tensionTrack.volume(this.currentTensionVolume);
+      this.actionTrack.volume(this.currentActionVolume);
       requestAnimationFrame(updateVolume);
     };
 
     updateVolume();
   }
 
-  /**
-   * 播放碰撞音效
-   */
+  // 音效播放方法
   public playCollisionSound(): void {
     if (this.sfx.collision.state() === 'loaded') {
       this.sfx.collision.play();
     }
   }
 
-  /**
-   * 播放道具音效
-   */
   public playPowerUpSound(): void {
     if (this.sfx.powerUp.state() === 'loaded') {
       this.sfx.powerUp.play();
     }
   }
 
-  /**
-   * 播放区块确认音效
-   */
   public playBlockConfirmSound(): void {
     if (this.sfx.blockConfirm.state() === 'loaded') {
       this.sfx.blockConfirm.play();
+    }
+  }
+
+  public playJumpSound(): void {
+    if (this.sfx.jump.state() === 'loaded') {
+      this.sfx.jump.play();
+    }
+  }
+
+  public playGameOverSound(): void {
+    if (this.sfx.gameOver.state() === 'loaded') {
+      this.sfx.gameOver.play();
+    }
+  }
+
+  public playDeathSound(): void {
+    if (this.sfx.death.state() === 'loaded') {
+      this.sfx.death.play();
+    }
+  }
+
+  public playLevelUpSound(): void {
+    if (this.sfx.levelUp.state() === 'loaded') {
+      this.sfx.levelUp.play();
+    }
+  }
+
+  public playScoreSound(): void {
+    if (this.sfx.score.state() === 'loaded') {
+      this.sfx.score.play();
     }
   }
 }

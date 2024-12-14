@@ -4,6 +4,7 @@ import { Block } from '../entities/Block';
 import { createProvider } from '../../utils/blockchain';
 import { GAME_CONFIG } from '../../config/constants';
 import { ParticleSystem } from '../effects/ParticleSystem';
+import { MusicSystem } from '../effects/MusicSystem';
 
 /**
  * 管理游戏中所有的方块
@@ -21,6 +22,7 @@ export class BlockManager {
   private difficultyMultiplier: number = 1; // 难度系数
   private txStatus: Map<string, number> = new Map(); // 存储交易哈希和状态 (1: 成功, 0: 失败, undefined: 待定)
   private particleSystem: ParticleSystem;
+  private musicSystem: MusicSystem;
   private networkState = {
     gasPrice: 0,
     pendingTxCount: 0,
@@ -35,10 +37,11 @@ export class BlockManager {
   private onBlockStatusChange?: (block: Block) => void;
   private canDestroyBlocks: boolean = false;
 
-  constructor(engine: Matter.Engine) {
+  constructor(engine: Matter.Engine, musicSystem: MusicSystem) {
     this.engine = engine;
     this.provider = createProvider();
     this.particleSystem = new ParticleSystem(engine);
+    this.musicSystem = musicSystem;
     this.setupBlockchainListener();
     this.calculateNextSpawnInterval();
     this.startRealtimeBlockchainEventListening();
@@ -181,6 +184,7 @@ export class BlockManager {
         if ((oldStatus === undefined && receipt.status === 0) || receipt.status === 2) {
           // status 2 表示Dropped
           this.handleFailedTransaction(block);
+        } else if (receipt.status === 1 && confirmations >= 3 && !block.isFullyConfirmed()) {
         }
 
         // 触发状态变化回调
@@ -197,6 +201,8 @@ export class BlockManager {
   }
 
   private handleFailedTransaction(block: Block) {
+    this.musicSystem.playBlockConfirmSound();
+
     // 如果方块已经在淡出，不处理
     if (block.isFading()) return;
 
@@ -380,6 +386,8 @@ export class BlockManager {
 
       // 如果交易已确认（有状态），触发爆炸效果
       if (status !== undefined && !block.isFading()) {
+        this.musicSystem.playBlockConfirmSound();
+
         const pos = block.getPosition();
         // 使用方块的原始颜色
         const effectColor = block.body.render.fillStyle;
@@ -580,5 +588,27 @@ export class BlockManager {
 
   public getCanDestroyBlocks(): boolean {
     return this.canDestroyBlocks;
+  }
+
+  /**
+   * 获取当前网络拥堵程度 (0-1)
+   */
+  public getCongestionLevel(): number {
+    const { gasPrice, pendingTxCount } = this.networkState;
+
+    // 计算 gas 价格的拥堵程度 (0-1)
+    const gasPriceCongestion = Math.min(gasPrice / GAME_CONFIG.PHYSICS.NETWORK.MAX_GAS_PRICE, 1);
+
+    // 计算待处理交易的拥堵程度 (0-1)
+    const pendingTxCongestion = Math.min(
+      pendingTxCount / GAME_CONFIG.PHYSICS.NETWORK.MAX_PENDING_TX,
+      1
+    );
+
+    // 根据权重计算总体拥堵程度
+    return (
+      gasPriceCongestion * GAME_CONFIG.PHYSICS.NETWORK.CONGESTION_WEIGHTS.GAS_PRICE +
+      pendingTxCongestion * GAME_CONFIG.PHYSICS.NETWORK.CONGESTION_WEIGHTS.PENDING_TX
+    );
   }
 }

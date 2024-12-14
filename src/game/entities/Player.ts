@@ -1,6 +1,7 @@
 import Matter from 'matter-js';
 import { GAME_CONFIG } from '../../config/constants';
 import { BlockManager } from '../managers/BlockManager';
+import { MusicSystem } from '../audio/MusicSystem';
 
 /**
  * 玩家角色类
@@ -22,15 +23,18 @@ export class Player {
   /** 无敌状态下的闪烁效果计时器 */
   private invincibilityBlinkTimer: number = 0;
   private blockManager: BlockManager;
+  private musicSystem: MusicSystem;
 
   /**
    * 创建玩家角色
    * @param engine - Matter.js 物理引擎实例
    * @param blockManager - BlockManager 实例
+   * @param musicSystem - MusicSystem 实例
    */
-  constructor(engine: Matter.Engine, blockManager: BlockManager) {
+  constructor(engine: Matter.Engine, blockManager: BlockManager, musicSystem: MusicSystem) {
     this.engine = engine;
     this.blockManager = blockManager;
+    this.musicSystem = musicSystem;
 
     // 创建玩家物理体
     this.body = Matter.Bodies.rectangle(
@@ -216,6 +220,7 @@ export class Player {
         y: this.jumpForce,
       });
       this.isJumping = true;
+      this.musicSystem.playJumpSound();
     }
   }
 

@@ -73,11 +73,11 @@ export class Engine {
     );
 
     // 创建区块管理器
-    this.blockManager = new BlockManager(this.engine);
+    this.blockManager = new BlockManager(this.engine, this.musicSystem);
     this.blockManager.setNetworkStateChangeCallback(this.onNetworkStateChange.bind(this));
-    
+
     // 创建玩家
-    this.player = new Player(this.engine, this.blockManager);
+    this.player = new Player(this.engine, this.blockManager, this.musicSystem);
 
     // 设置区块状态变化回调
     this.blockManager.setBlockStatusChangeCallback(block => {
@@ -257,6 +257,20 @@ export class Engine {
           const block = this.blockManager.getBlockByBody(otherBody);
           if (!block) return;
 
+          // 计算相对速度
+          const relativeVelocity = {
+            x: Math.abs(otherBody.velocity.x - playerBody.velocity.x),
+            y: Math.abs(otherBody.velocity.y - playerBody.velocity.y),
+          };
+          const totalRelativeVelocity = Math.sqrt(
+            relativeVelocity.x * relativeVelocity.x + relativeVelocity.y * relativeVelocity.y
+          );
+
+          // 只有当相对速度足够大时才播放碰撞音效
+          if (totalRelativeVelocity > 1) {
+            this.musicSystem.playCollisionSound();
+          }
+
           // 只有当玩家不是无敌状态，且方块从上方高速砸下来时才扣生命值
           const isBlockAbovePlayer = otherBody.position.y < playerBody.position.y;
           const fallingSpeed = otherBody.velocity.y;
@@ -271,8 +285,6 @@ export class Engine {
               '#ff0000',
               20
             );
-            // 播放碰撞音效
-            this.musicSystem.playCollisionSound();
           }
         } else if (otherBody.label === 'powerup') {
           // 获取并应用道具效果
@@ -352,6 +364,10 @@ export class Engine {
     const centerX = this.render.options.width! / 2;
     const centerY = this.render.options.height! / 2;
     this.particleSystem.createExplosion(centerX, centerY, '#ff0000', 50);
+
+    // 播放游戏结束音效
+    this.musicSystem.playGameOverSound();
+    this.musicSystem.playDeathSound();
 
     // 显示游戏结束画面
     this.hud.showGameOver();
@@ -720,16 +736,16 @@ export class Engine {
     try {
       // 从区块链获取实时数据
       const networkStatus = await this.blockchainService.getNetworkStatus();
-      
+
       // 更新游戏状态
       this.networkState = networkStatus;
-      
+
       // 更新HUD显示
       this.hud.updateNetworkStatus(networkStatus);
-      
+
       // 更新重力
       this.engine.gravity.y = GAME_CONFIG.PHYSICS.DEFAULT_GRAVITY * networkStatus.blockchainGravity;
-      
+
       // 每10秒更新一次网络状态
       setTimeout(() => this.updateNetworkStatus(), 10000);
     } catch (error) {

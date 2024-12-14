@@ -7,7 +7,7 @@ export const GAME_CONFIG = {
   PLAYER: {
     WIDTH: 30,
     HEIGHT: 30,
-    JUMP_FORCE: -10,
+    JUMP_FORCE: -7, // 减小跳跃力度，原来是 -10
     MOVE_SPEED: 5,
     INITIAL_LIVES: 3,
     COLOR: '#00ff00'
