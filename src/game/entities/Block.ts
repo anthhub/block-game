@@ -28,7 +28,7 @@ export class Block {
   private originalColor: string;
   private isFadingOut: boolean = false;
   /** 标记方块是否已被计分 */
-  private isScored: boolean = false;
+  public isScored: boolean = false;
 
   /**
    * 创建一个新的方块实例
@@ -38,11 +38,11 @@ export class Block {
   constructor(engine: Matter.Engine, tx: ethers.TransactionResponse) {
     this.tx = tx;
     this.originalColor = getBlockColor(tx);
-    
+
     // 计算方块尺寸和位置
     const { width, height } = calculateBlockDimensions(tx);
     const x = Math.random() * (window.innerWidth - width) + width / 2;
-    
+
     // 创建方块
     this.body = Matter.Bodies.rectangle(x, -height, width, height, {
       label: 'block',
@@ -50,29 +50,23 @@ export class Block {
         fillStyle: this.originalColor,
         opacity: 1,
       },
-      friction: 0.8,        // 增加摩擦力
-      frictionAir: 0.01,    // 增加空气阻力
-      frictionStatic: 1,    // 增加静摩擦力
-      restitution: 0.2,     // 降低弹性
-      density: 0.001,       // 降低密度，使其下落更慢
+      friction: 0.8, // 增加摩擦力
+      frictionAir: 0.01, // 增加空气阻力
+      frictionStatic: 1, // 增加静摩擦力
+      restitution: 0.2, // 降低弹性
+      density: 0.001, // 降低密度，使其下落更慢
     });
 
-    // 添加交易信息到方块的用户数据中
-    this.body.render.text = {
-      content: `${formatEthAmount(tx.value)}\n${formatAddress(tx.from)} → ${formatAddress(tx.to || '')}`,
-      color: '#ffffff',
-      size: 14,
-      family: 'Arial',
-    };
-    
     // 将方块添加到物理世界中
     Matter.World.add(engine.world, this.body);
 
     // 监听碰撞事件
-    Matter.Events.on(engine, 'collisionStart', (event) => {
-      event.pairs.forEach((pair) => {
-        if ((pair.bodyA === this.body || pair.bodyB === this.body) &&
-            (pair.bodyA.label === 'ground' || pair.bodyB.label === 'ground')) {
+    Matter.Events.on(engine, 'collisionStart', event => {
+      event.pairs.forEach(pair => {
+        if (
+          (pair.bodyA === this.body || pair.bodyB === this.body) &&
+          (pair.bodyA.label === 'ground' || pair.bodyB.label === 'ground')
+        ) {
           this.onLand();
         }
       });
@@ -81,7 +75,7 @@ export class Block {
 
   private onLand() {
     if (this.isLanded) return;
-    
+
     this.isLanded = true;
     // 落地后固定位置
     Matter.Body.setStatic(this.body, true);
@@ -109,12 +103,12 @@ export class Block {
     if (this.isFadingOut && this.currentScale > 0) {
       // 减小缩放和透明度
       this.currentScale = Math.max(0, this.currentScale - this.fadeSpeed);
-      
+
       // 更新渲染属性
       if (this.body.render) {
         this.body.render.opacity = this.currentScale;
       }
-      
+
       // 缩小方块
       const scaleChange = 1 - this.fadeSpeed;
       Matter.Body.scale(this.body, scaleChange, scaleChange);
@@ -189,7 +183,7 @@ export class Block {
   /**
    * 开始淡出效果
    */
-  private startFadeOut() {
+  public startFadeOut() {
     this.isFadingOut = true;
   }
 
@@ -203,10 +197,10 @@ export class Block {
   /**
    * 获取方块位置
    */
-  public getPosition(): { x: number, y: number } {
+  public getPosition(): { x: number; y: number } {
     return {
       x: this.body.position.x,
-      y: this.body.position.y
+      y: this.body.position.y,
     };
   }
 
@@ -247,7 +241,7 @@ export class Block {
       x: min.x,
       y: min.y,
       width: max.x - min.x,
-      height: max.y - min.y
+      height: max.y - min.y,
     };
   }
 

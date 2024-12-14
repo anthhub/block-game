@@ -3,7 +3,9 @@ import { PowerUp } from '../entities/PowerUp';
 import { PowerUpType, PowerUpEffect } from '../types';
 import { GAME_CONFIG } from '../../config/constants';
 import { isOutOfBounds } from '../../utils/physics';
-import { PowerUpIndicator } from '../../components/PowerUpIndicator';
+import { Player } from '../entities/Player';
+import { MusicSystem } from '../audio/MusicSystem';
+import { PowerUpIndicator } from '../effects/PowerUpIndicator';
 
 /**
  * 能力增强道具管理器
@@ -18,10 +20,15 @@ export class PowerUpManager {
   private activeEffects: PowerUpEffect[] = [];
   /** 道具状态指示器 */
   private powerUpIndicator: PowerUpIndicator;
-  private player: any; // player对象
-  private musicSystem: any; // 音乐系统对象
+  private player: Player; // player对象
+  private musicSystem: MusicSystem; // 音乐系统对象
 
-  constructor(engine: Matter.Engine, powerUpIndicator: PowerUpIndicator, player: any, musicSystem: any) {
+  constructor(
+    engine: Matter.Engine,
+    powerUpIndicator: PowerUpIndicator,
+    player: Player,
+    musicSystem: MusicSystem
+  ) {
     this.engine = engine;
     this.powerUpIndicator = powerUpIndicator;
     this.player = player;
@@ -49,15 +56,15 @@ export class PowerUpManager {
 
     if (Math.random() < GAME_CONFIG.POWER_UPS.SPAWN_CHANCE) {
       // 随机选择一个道具类型
-      const type = Math.floor(Math.random() * Object.keys(PowerUpType).length / 2) as PowerUpType;
-      
+      const type = Math.floor((Math.random() * Object.keys(PowerUpType).length) / 2) as PowerUpType;
+
       // 在屏幕上方随机位置生成道具
       const x = Math.random() * (window.innerWidth - 100) + 50; // 离边缘至少50像素
       const y = 50; // 固定在屏幕上方50像素处
-      
+
       const powerUp = new PowerUp(this.engine, type);
       Matter.Body.setPosition(powerUp.body, { x, y });
-      
+
       this.powerUps.push(powerUp);
     }
   }
@@ -85,7 +92,7 @@ export class PowerUpManager {
     // 添加到活跃效果列表
     this.activeEffects.push({
       type,
-      expiresAt: Date.now() + duration
+      expiresAt: Date.now() + duration,
     });
 
     // 显示道具效果提示

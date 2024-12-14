@@ -1,11 +1,14 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
 
 export default defineConfig({
   build: {
-    // 在构建时忽略类型检查
-    typescript: {
-      noEmit: false,
-      ignoreBuildErrors: true,
-    }
-  }
-})
+    sourcemap: true,
+    minify: 'terser',
+    terserOptions: {
+      ecma: 2020,
+      compress: {
+        drop_console: true,
+      },
+    },
+  },
+});

@@ -52,7 +52,7 @@ export class BlockManager {
 
   private setupBlockchainListener() {
     // 监听新的pending交易
-    this.provider.on('pending', (tx) => {
+    this.provider.on('pending', tx => {
       this.provider.getTransaction(tx).then(transaction => {
         if (transaction && this.txBuffer.length < this.maxBufferSize) {
           this.txBuffer.push(transaction);
@@ -97,19 +97,6 @@ export class BlockManager {
     }
   }
 
-  private async updateBlockTransactionStatuses() {
-    const delay = 200; // 200ms delay between each transaction check
-    for (const [blockId, block] of Object.entries(this.blocks)) {
-      if (this.txStatus[block.txHash] === undefined) {
-        const status = await this.getTransactionStatus(block.txHash);
-        if (status !== undefined) {
-          this.txStatus[block.txHash] = status;
-        }
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
-
   /**
    * 立即更新指定方块的交易状态
    */
@@ -120,17 +107,17 @@ export class BlockManager {
 
       const receipt = await this.provider.getTransactionReceipt(hash);
       const currentBlock = await this.provider.getBlockNumber();
-      
+
       if (receipt) {
         const confirmations = currentBlock - receipt.blockNumber + 1;
         const oldStatus = this.txStatus.get(hash);
         this.txStatus.set(hash, receipt.status);
-        
+
         // 如果交易从pending变为失败，触发黑洞效果
         if (oldStatus === undefined && receipt.status === 0) {
           this.handleFailedTransaction(block);
         }
-        
+
         // 触发状态变化回调
         if (this.onBlockStatusChange) {
           this.onBlockStatusChange(block);
@@ -151,13 +138,10 @@ export class BlockManager {
     // 获取周围的方块
     const radius = 100;
     const blockPos = block.body.position;
-    const nearbyBodies = Matter.Query.region(
-      this.engine.world.bodies,
-      {
-        min: { x: blockPos.x - radius, y: blockPos.y - radius },
-        max: { x: blockPos.x + radius, y: blockPos.y + radius }
-      }
-    );
+    const nearbyBodies = Matter.Query.region(this.engine.world.bodies, {
+      min: { x: blockPos.x - radius, y: blockPos.y - radius },
+      max: { x: blockPos.x + radius, y: blockPos.y + radius },
+    });
 
     // 找到周围未开始淡出的方块
     const nearbyBlocks = nearbyBodies
@@ -192,9 +176,8 @@ export class BlockManager {
         this.networkState.gasPrice = parseFloat(ethers.formatUnits(feeData.gasPrice || 0n, 'gwei'));
 
         // 获取待处理交易数量
-        const pendingBlock = await this.provider.send('eth_getBlockByNumber', ['pending', false]);
-        this.networkState.pendingTxCount = pendingBlock.transactions.length;
-
+        const pendingTxCount = await this.provider.getTransactionCount('pending');
+        this.networkState.pendingTxCount = pendingTxCount;
         // 计算网络拥堵程度 (0-1)
         const congestionLevel = this.calculateCongestionLevel();
 
@@ -227,8 +210,8 @@ export class BlockManager {
    * 计算网络拥堵程度 (0-1)
    */
   private calculateCongestionLevel(): number {
-    const { NETWORK, MAX_GAS_PRICE, MAX_PENDING_TX } = GAME_CONFIG.PHYSICS.NETWORK;
-    
+    const { MAX_GAS_PRICE, MAX_PENDING_TX, CONGESTION_WEIGHTS } = GAME_CONFIG.PHYSICS.NETWORK;
+
     // Gas价格评分 (0-1)
     const gasScore = Math.min(this.networkState.gasPrice / MAX_GAS_PRICE, 1);
 
@@ -236,8 +219,10 @@ export class BlockManager {
     const pendingScore = Math.min(this.networkState.pendingTxCount / MAX_PENDING_TX, 1);
 
     // 根据权重计算综合拥堵度
-    return gasScore * NETWORK.CONGESTION_WEIGHTS.GAS_PRICE + 
-           pendingScore * NETWORK.CONGESTION_WEIGHTS.PENDING_TX;
+    return (
+      gasScore * CONGESTION_WEIGHTS.GAS_PRICE +
+      pendingScore * CONGESTION_WEIGHTS.PENDING_TX
+    );
   }
 
   /**
@@ -245,22 +230,19 @@ export class BlockManager {
    */
   private updateGravity(congestionLevel: number) {
     const { GRAVITY } = GAME_CONFIG.PHYSICS;
-    
+
     // 根据拥堵程度计算重力
-    const gravity = GRAVITY.BASE + 
-      (congestionLevel * (GRAVITY.MAX - GRAVITY.MIN)) * GRAVITY.SCALE_FACTOR;
+    const gravity =
+      GRAVITY.BASE + congestionLevel * (GRAVITY.MAX - GRAVITY.MIN) * GRAVITY.SCALE_FACTOR;
 
     // 平滑过渡到新的重力值
     const currentGravity = this.engine.world.gravity.y;
     const smoothFactor = 0.1; // 平滑因子
-    
+
     const newGravity = currentGravity + (gravity - currentGravity) * smoothFactor;
-    
+
     // 更新物理引擎的重力
-    Matter.World.setGravity(this.engine.world, {
-      x: 0,
-      y: newGravity
-    });
+    this.engine.gravity.y = newGravity;
   }
 
   /**
@@ -272,13 +254,13 @@ export class BlockManager {
 
     // 调整生成速度
     const { SPAWN_INTERVAL } = GAME_CONFIG.BLOCK;
-    const baseInterval = SPAWN_INTERVAL.BASE - 
-      (congestionLevel * (SPAWN_INTERVAL.BASE - SPAWN_INTERVAL.MIN));
-    
+    const baseInterval =
+      SPAWN_INTERVAL.BASE - congestionLevel * (SPAWN_INTERVAL.BASE - SPAWN_INTERVAL.MIN);
+
     // 添加随机变化
     const variance = baseInterval * SPAWN_INTERVAL.VARIANCE;
     this.nextSpawnInterval = baseInterval + (Math.random() * 2 - 1) * variance;
-    
+
     // 确保在允许范围内
     this.nextSpawnInterval = Math.max(
       SPAWN_INTERVAL.MIN,
@@ -392,7 +374,7 @@ export class BlockManager {
 
   private async updateNetworkState() {
     const now = Date.now();
-    
+
     // 每隔一段时间更新一次网络状态
     if (now - this.networkState.lastUpdate >= this.networkState.updateInterval) {
       try {
@@ -477,7 +459,10 @@ export class BlockManager {
   /**
    * 获取指定区块的交易状态
    */
-  public getBlockTransactionStatus(block: Block): { status: 'pending' | 'success' | 'failed'; confirmations?: number } {
+  public getBlockTransactionStatus(block: Block): {
+    status: 'pending' | 'success' | 'failed';
+    confirmations?: number;
+  } {
     const txHash = block.getTransactionHash();
     const status = this.txStatus.get(txHash);
 
@@ -487,10 +472,10 @@ export class BlockManager {
 
     // 获取确认数
     const confirmations = block.getConfirmations();
-    
+
     return {
       status: status === 1 ? 'success' : 'failed',
-      confirmations: confirmations > 0 ? confirmations : undefined
+      confirmations: confirmations > 0 ? confirmations : undefined,
     };
   }
 
@@ -515,7 +500,7 @@ export class BlockManager {
   /**
    * 获取指定 body 的区块
    */
-  private getBlockByBody(body: Matter.Body): Block | null {
+  public getBlockByBody(body: Matter.Body): Block | null {
     return this.blocks.find(block => block.body === body) || null;
   }
 }

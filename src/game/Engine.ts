@@ -10,6 +10,7 @@ import { GameState } from '../store/gameStore';
 import { PowerUpIndicator } from './effects/PowerUpIndicator';
 import { GAME_CONFIG } from '../config/constants';
 import { createPhysicsEngine, createRenderer } from '../utils/physics';
+import { Block } from './entities/Block';
 
 /**
  * 游戏主引擎类
@@ -341,9 +342,6 @@ export class Engine {
     const centerX = this.render.options.width! / 2;
     const centerY = this.render.options.height! / 2;
     this.particleSystem.createExplosion(centerX, centerY, '#ff0000', 50);
-
-    // 播放游戏结束音效
-    this.musicSystem.playGameOverSound();
 
     // 显示游戏结束画面
     this.hud.showGameOver();

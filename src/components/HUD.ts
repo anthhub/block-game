@@ -134,7 +134,7 @@ export class HUD {
   /**
    * 显示游戏结束画面
    */
-  private showGameOver() {
+  public showGameOver() {
     this.gameOverElement.style.display = 'flex';
   }
 

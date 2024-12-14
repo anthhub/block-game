@@ -1,12 +1,16 @@
 import { GAME_CONFIG } from '../../config/constants';
 
+interface IndicatorElement extends HTMLDivElement {
+  timer?: number | NodeJS.Timeout;
+}
+
 /**
  * 道具效果指示器
  * 显示当前激活的道具效果及其剩余时间
  */
 export class PowerUpIndicator {
   private container: HTMLDivElement;
-  private indicators: Map<string, HTMLDivElement> = new Map();
+  private indicators: Map<string, IndicatorElement> = new Map();
 
   constructor() {
     this.container = document.createElement('div');
@@ -27,7 +31,7 @@ export class PowerUpIndicator {
    */
   showEffect(type: string, duration: number) {
     let indicator = this.indicators.get(type);
-    
+
     if (!indicator) {
       indicator = document.createElement('div');
       indicator.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
@@ -51,7 +55,7 @@ export class PowerUpIndicator {
     const startTime = Date.now();
     const updateTimer = () => {
       const remaining = Math.max(0, duration - (Date.now() - startTime));
-      
+
       if (remaining <= 0) {
         indicator!.style.animation = 'fadeOut 0.3s ease-in-out';
         setTimeout(() => {
@@ -86,7 +90,7 @@ export class PowerUpIndicator {
 
     // 立即更新一次
     updateTimer();
-    
+
     // 每100ms更新一次
     indicator.timer = setInterval(updateTimer, 100);
   }
