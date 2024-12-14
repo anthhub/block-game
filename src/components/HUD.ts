@@ -293,7 +293,7 @@ export class HUD {
               <span style="color: ${gravityColor};">
                 ${'●'.repeat(gravityLevel)}${'○'.repeat(5 - gravityLevel)}
               </span>
-              <span style="color: #9E9E9E;">重力 ${gravityPercentage}%</span>
+              <span style="color: #9E9E9E;">重力 ${gravityPercentage || ''}%</span>
             </div>
           </div>
         </div>

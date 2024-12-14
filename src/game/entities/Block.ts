@@ -2,6 +2,7 @@ import Matter from 'matter-js';
 import { ethers } from 'ethers';
 import {
   calculateBlockDimensions,
+  calculateBlockPhysics,
   getBlockColor,
   formatAddress,
   formatEthAmount,
@@ -39,23 +40,48 @@ export class Block {
     this.tx = tx;
     this.originalColor = getBlockColor(tx);
 
-    // 计算方块尺寸和位置
-    const { width, height } = calculateBlockDimensions(tx);
-    const x = Math.random() * (window.innerWidth - width) + width / 2;
-
+    // 计算方块的物理属性
+    const physics = calculateBlockPhysics(tx);
+    
     // 创建方块
-    this.body = Matter.Bodies.rectangle(x, -height, width, height, {
+    const options: Matter.IBodyDefinition = {
       label: 'block',
       render: {
         fillStyle: this.originalColor,
         opacity: 1,
       },
-      friction: 0.8, // 增加摩擦力
-      frictionAir: 0.01, // 增加空气阻力
-      frictionStatic: 1, // 增加静摩擦力
-      restitution: 0.2, // 降低弹性
-      density: 0.001, // 降低密度，使其下落更慢
+      friction: physics.friction,
+      frictionAir: 0.01,
+      frictionStatic: 1,
+      restitution: physics.restitution,
+      density: physics.density,
+      angle: Math.random() * Math.PI / 4 - Math.PI / 8,
+    };
+
+    // 根据是否有自定义形状创建刚体
+    if (physics.vertices) {
+      this.body = Matter.Bodies.fromVertices(
+        Math.random() * (window.innerWidth - physics.size) + physics.size / 2,
+        -physics.size,
+        [physics.vertices],
+        options
+      );
+    } else {
+      this.body = Matter.Bodies.rectangle(
+        Math.random() * (window.innerWidth - physics.size) + physics.size / 2,
+        -physics.size,
+        physics.size,
+        physics.size,
+        options
+      );
+    }
+
+    // 设置初始速度和角速度
+    Matter.Body.setVelocity(this.body, {
+      x: 0,
+      y: physics.speed
     });
+    Matter.Body.setAngularVelocity(this.body, physics.spin);
 
     // 将方块添加到物理世界中
     Matter.World.add(engine.world, this.body);
