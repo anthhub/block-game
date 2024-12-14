@@ -22,6 +22,8 @@ export class Player {
   private isInvincible: boolean = false;
   /** 无敌状态下的闪烁效果计时器 */
   private invincibilityBlinkTimer: number = 0;
+  /** 是否按下了向下键 */
+  private isPressingDown: boolean = false;
   private blockManager: BlockManager;
   private musicSystem: MusicSystem;
 
@@ -104,43 +106,51 @@ export class Player {
     });
   }
 
-  /**
-   * 设置键盘控制
-   * - 左右方向键：水平移动
-   * - 空格键/上方向键/W键：跳跃（需要在地面上）
-   */
   private setupControls() {
-    window.addEventListener('keydown', event => {
-      switch (event.code) {
+    document.addEventListener('keydown', (event) => {
+      switch (event.key) {
         case 'ArrowLeft':
-        case 'KeyA':
           Matter.Body.setVelocity(this.body, {
             x: -this.moveSpeed,
             y: this.body.velocity.y,
           });
           break;
         case 'ArrowRight':
-        case 'KeyD':
           Matter.Body.setVelocity(this.body, {
             x: this.moveSpeed,
             y: this.body.velocity.y,
           });
           break;
-        case 'Space':
+        case ' ':
         case 'ArrowUp':
-        case 'KeyW':
+        case 'w':
+        case 'W':
           this.jump();
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          this.isPressingDown = true;
+          // 如果正在跳跃中，降低跳跃高度
+          if (this.isJumping && this.body.velocity.y < 0) {
+            Matter.Body.setVelocity(this.body, {
+              x: this.body.velocity.x,
+              y: this.body.velocity.y * 0.5, // 降低向上的速度
+            });
+          }
           break;
       }
     });
 
-    // 停止移动
-    window.addEventListener('keyup', event => {
-      switch (event.code) {
+    document.addEventListener('keyup', (event) => {
+      switch (event.key) {
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          this.isPressingDown = false;
+          break;
         case 'ArrowLeft':
-        case 'KeyA':
         case 'ArrowRight':
-        case 'KeyD':
           Matter.Body.setVelocity(this.body, {
             x: 0,
             y: this.body.velocity.y,
@@ -150,58 +160,47 @@ export class Player {
     });
   }
 
-  /**
-   * 设置触摸控制
-   * - 左右滑动：水平移动
-   * - 向上滑动：跳跃（需要在地面上）
-   */
   private setupTouchControls() {
-    let startX: number = 0;
-    let startY: number = 0;
+    let touchStartY = 0;
+    let touchStartX = 0;
 
-    window.addEventListener('touchstart', event => {
-      const touch = event.touches[0];
-      startX = touch.clientX;
-      startY = touch.clientY;
+    document.addEventListener('touchstart', (event) => {
+      touchStartY = event.touches[0].clientY;
+      touchStartX = event.touches[0].clientX;
     });
 
-    window.addEventListener('touchmove', event => {
-      const touch = event.touches[0];
-      const deltaX = touch.clientX - startX;
-      const deltaY = touch.clientY - startY;
+    document.addEventListener('touchmove', (event) => {
+      const touchY = event.touches[0].clientY;
+      const touchX = event.touches[0].clientX;
+      const deltaY = touchY - touchStartY;
+      const deltaX = touchX - touchStartX;
 
-      // 水平滑动控制移动
+      // 向下滑动
+      if (deltaY > 50) {
+        this.isPressingDown = true;
+        if (this.isJumping && this.body.velocity.y < 0) {
+          Matter.Body.setVelocity(this.body, {
+            x: this.body.velocity.x,
+            y: this.body.velocity.y * 0.5,
+          });
+        }
+      }
+      // 向上滑动
+      else if (deltaY < -50) {
+        this.jump();
+      }
+
+      // 水平移动
       if (Math.abs(deltaX) > 30) {
-        // 设定一个滑动阈值
-        const direction = deltaX > 0 ? 1 : -1;
         Matter.Body.setVelocity(this.body, {
-          x: direction * this.moveSpeed,
+          x: deltaX > 0 ? this.moveSpeed : -this.moveSpeed,
           y: this.body.velocity.y,
         });
       }
-
-      // 垂直滑动控制跳跃
-      if (deltaY < -30) {
-        // 向上滑动
-        this.jump();
-      }
     });
 
-    window.addEventListener('touchend', event => {
-      const touch = event.changedTouches[0];
-      const collision = Matter.Query.point(this.engine.world.bodies, {
-        x: touch.clientX,
-        y: touch.clientY,
-      })[0];
-
-      if (collision && collision.label === 'block' && this.blockManager.getCanDestroyBlocks()) {
-        const block = this.blockManager.getBlockByBody(collision);
-        if (block) {
-          block.destroy();
-        }
-      }
-
-      // 停止移动
+    document.addEventListener('touchend', () => {
+      this.isPressingDown = false;
       Matter.Body.setVelocity(this.body, {
         x: 0,
         y: this.body.velocity.y,
@@ -255,6 +254,14 @@ export class Player {
         y: groundLevel,
       });
       this.isJumping = false;
+    }
+
+    // 如果按下向下键，增加下落速度
+    if (this.isPressingDown && this.body.velocity.y > 0) {
+      Matter.Body.setVelocity(this.body, {
+        x: this.body.velocity.x,
+        y: this.body.velocity.y * 1.1, // 增加下落速度
+      });
     }
 
     // 限制在屏幕范围内
