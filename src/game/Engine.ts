@@ -58,6 +58,11 @@ export class Engine {
     this.hud = hud;
     this.blockchainService = new BlockchainService();
 
+    // 创建过渡效果
+    const transition = document.createElement('div');
+    transition.className = 'game-transition';
+    document.body.appendChild(transition);
+
     // 初始化音乐系统
     this.musicSystem = new MusicSystem();
 
@@ -141,6 +146,14 @@ export class Engine {
 
     // 定期更新网络状态
     setInterval(() => this.updateNetworkStatus(), 3000);
+
+    // 添加过渡效果淡出
+    requestAnimationFrame(() => {
+      transition.classList.add('fade-out');
+      setTimeout(() => {
+        transition.remove();
+      }, 1000);
+    });
   }
 
   private setupUI() {
