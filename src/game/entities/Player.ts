@@ -51,6 +51,9 @@ export class Player {
     // 设置键盘控制
     this.setupControls();
 
+    // 设置触摸控制
+    this.setupTouchControls();
+
     // 设置碰撞检测
     this.setupCollisions();
   }
@@ -133,6 +136,50 @@ export class Player {
           });
           break;
       }
+    });
+  }
+
+  /**
+   * 设置触摸控制
+   * - 左右滑动：水平移动
+   * - 向上滑动：跳跃（需要在地面上）
+   */
+  private setupTouchControls() {
+    let startX: number = 0;
+    let startY: number = 0;
+
+    window.addEventListener('touchstart', (event) => {
+      const touch = event.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+    });
+
+    window.addEventListener('touchmove', (event) => {
+      const touch = event.touches[0];
+      const deltaX = touch.clientX - startX;
+      const deltaY = touch.clientY - startY;
+
+      // 水平滑动控制移动
+      if (Math.abs(deltaX) > 30) { // 设定一个滑动阈值
+        const direction = deltaX > 0 ? 1 : -1;
+        Matter.Body.setVelocity(this.body, {
+          x: direction * this.moveSpeed,
+          y: this.body.velocity.y
+        });
+      }
+
+      // 垂直滑动控制跳跃
+      if (deltaY < -30) { // 向上滑动
+        this.jump();
+      }
+    });
+
+    window.addEventListener('touchend', () => {
+      // 停止移动
+      Matter.Body.setVelocity(this.body, {
+        x: 0,
+        y: this.body.velocity.y
+      });
     });
   }
 
