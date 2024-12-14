@@ -32,28 +32,32 @@ export const calculateBlockDimensions = (tx: ethers.TransactionResponse): BlockD
   const value = Number(tx.value) || 0;
   const dataSize = (tx.data?.length || 0) / 2 - 1;
 
-  // 归一化各个参数 (0-1范围)
-  const normalizedGas = Math.min(gasPrice / (500 * 1e9), 1);
-  const normalizedValue = Math.min(value / (100 * 1e18), 1);
-  const normalizedData = Math.min(dataSize / 10000, 1);
+  // 归一化各个参数 (0-1范围)，使用指数函数增加差异
+  const normalizedGas = Math.pow(Math.min(gasPrice / (500 * 1e9), 1), 0.5);  // 使用平方根增加小值的权重
+  const normalizedValue = Math.pow(Math.min(value / (100 * 1e18), 1), 0.5);
+  const normalizedData = Math.pow(Math.min(dataSize / 10000, 1), 0.5);
 
-  // 计算基础大小，保持原有范围
+  // 计算基础大小，增加权重差异
   const baseSize = GAME_CONFIG.BLOCK.MIN_SIZE + 
     (GAME_CONFIG.BLOCK.MAX_SIZE - GAME_CONFIG.BLOCK.MIN_SIZE) * 
-    (normalizedGas * 0.4 + normalizedValue * 0.4 + normalizedData * 0.2);
+    (normalizedGas * 0.5 + normalizedValue * 0.4 + normalizedData * 0.1);
+
+  // 添加随机变化因子，进一步增加大小差异
+  const randomFactor = 0.8 + Math.random() * 0.4; // 0.8-1.2的随机系数
+  const finalSize = baseSize * randomFactor;
 
   // 根据交易类型决定形状
   let shape: 'rectangle' | 'polygon' | 'circle' | 'star' | 'diamond' | 'triangle' | 'cross' | 'hexagram' = 'rectangle';
   let dimensions: BlockDimensions = {
-    width: baseSize,
-    height: baseSize,
+    width: finalSize,
+    height: finalSize,
     shape: 'rectangle'
   };
 
   // 高价值交易 - 使用巨大的菱形，给人强烈的压迫感
   if (normalizedValue > 0.2) {
     shape = 'diamond';
-    const size = baseSize * 5;  // 最大尺寸，5倍
+    const size = finalSize * 5;  // 最大尺寸，5倍
     dimensions.vertices = [
       { x: 0, y: -size },          // 更尖锐的顶部
       { x: size/1.8, y: 0 },
@@ -64,7 +68,7 @@ export const calculateBlockDimensions = (tx: ethers.TransactionResponse): BlockD
   // 高Gas交易 - 使用大号三角形，表示危险
   else if (normalizedGas > 0.4) {
     shape = 'triangle';
-    const size = baseSize * 4.5;   // 4.5倍大小
+    const size = finalSize * 4.5;   // 4.5倍大小
     dimensions.vertices = [
       { x: 0, y: -size },          // 尖锐的顶部
       { x: size/1.2, y: size/1.2 },
@@ -74,7 +78,7 @@ export const calculateBlockDimensions = (tx: ethers.TransactionResponse): BlockD
   // 合约创建交易 - 使用大型十六边形
   else if (!tx.to) {
     shape = 'polygon';
-    const radius = baseSize * 4;  // 4倍大小
+    const radius = finalSize * 4;  // 4倍大小
     dimensions.vertices = Array.from({ length: 16 }, (_, i) => ({
       x: radius * Math.cos(i * Math.PI / 8),
       y: radius * Math.sin(i * Math.PI / 8)
@@ -83,13 +87,13 @@ export const calculateBlockDimensions = (tx: ethers.TransactionResponse): BlockD
   // ERC20转账 - 使用中等圆形
   else if (tx.data.startsWith('0xa9059cbb') || tx.data.startsWith('0x23b872dd')) {
     shape = 'circle';
-    dimensions.width = baseSize * 3;   // 3倍大小
-    dimensions.height = baseSize * 3;
+    dimensions.width = finalSize * 3;   // 3倍大小
+    dimensions.height = finalSize * 3;
   }
   // ERC721 NFT转账 - 使用中型六芒星
   else if (tx.data.startsWith('0x42842e0e')) {
     shape = 'hexagram';
-    const outerRadius = baseSize * 2.8;  // 2.8倍大小
+    const outerRadius = finalSize * 2.8;  // 2.8倍大小
     const innerRadius = outerRadius * 0.4;
     const points: Matter.Vector[] = [];
     
@@ -107,7 +111,7 @@ export const calculateBlockDimensions = (tx: ethers.TransactionResponse): BlockD
   // 大数据交易 - 使用中型十字形
   else if (normalizedData > 0.3) {
     shape = 'cross';
-    const baseScale = baseSize * 2.5;  // 2.5倍基础大小
+    const baseScale = finalSize * 2.5;  // 2.5倍基础大小
     const armWidth = baseScale * 0.2;   // 较细的手臂
     const armLength = baseScale * 1.2;  // 较长的手臂
     dimensions.vertices = [
@@ -129,7 +133,7 @@ export const calculateBlockDimensions = (tx: ethers.TransactionResponse): BlockD
   // 普通交易 - 使用小型矩形
   else {
     const ratio = 0.4 + normalizedGas * 1.2; // 0.4-1.6的宽高比
-    const size = baseSize * 2; // 最小2倍大小
+    const size = finalSize * 2; // 最小2倍大小
     dimensions.width = size * ratio;
     dimensions.height = size / ratio;
   }

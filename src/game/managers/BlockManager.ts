@@ -113,8 +113,8 @@ export class BlockManager {
         const oldStatus = this.txStatus.get(hash);
         this.txStatus.set(hash, receipt.status);
 
-        // 如果交易从pending变为失败，触发黑洞效果
-        if (oldStatus === undefined && receipt.status === 0) {
+        // 如果交易从pending变为失败或者被Dropped，触发黑洞效果
+        if ((oldStatus === undefined && receipt.status === 0) || receipt.status === 2) {  // status 2 表示Dropped
           this.handleFailedTransaction(block);
         }
 
