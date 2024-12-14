@@ -152,7 +152,7 @@ export class Engine {
       transition.classList.add('fade-out');
       setTimeout(() => {
         transition.remove();
-      }, 1000);
+      }, 800);
     });
   }
 
