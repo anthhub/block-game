@@ -161,3 +161,7 @@ body {
 .game-transition.fade-out {
   opacity: 0;
 }
+
+#feedback-toolbar {
+  display: none !important;
+}
