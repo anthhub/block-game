@@ -30,6 +30,7 @@ export class Block {
   private isFadingOut: boolean = false;
   /** 标记方块是否已被计分 */
   public isScored: boolean = false;
+  private lastStatusUpdateTime: number = 0;
 
   /**
    * 创建一个新的方块实例
@@ -332,5 +333,26 @@ export class Block {
    */
   public getIsScored(): boolean {
     return this.isScored;
+  }
+
+  /**
+   * 获取上次状态更新时间
+   */
+  public getLastStatusUpdateTime(): number {
+    return this.lastStatusUpdateTime;
+  }
+
+  /**
+   * 更新状态更新时间
+   */
+  public updateLastStatusUpdateTime(): void {
+    this.lastStatusUpdateTime = Date.now();
+  }
+
+  /**
+   * 检查是否已确认
+   */
+  public isConfirmed(): boolean {
+    return this.confirmations > 0;
   }
 }

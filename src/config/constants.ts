@@ -50,8 +50,9 @@ export const GAME_CONFIG = {
       BASE: 1000,      // 基础生成间隔 (ms)
       MIN: 500,        // 最小生成间隔
       MAX: 2000,       // 最大生成间隔
-      VARIANCE: 0.3    // 随机变化范围 (±30%)
+      VARIANCE: 0.2    // 随机变化范围 (相对于基础间隔的比例)
     },
+    STATUS_UPDATE_INTERVAL: 5000,  // 区块状态更新间隔 (ms)
     GAS_PRICE_THRESHOLDS: {
       HIGH: 100,
       MEDIUM: 50

@@ -123,6 +123,9 @@ export class BlockManager {
           this.onBlockStatusChange(block);
         }
       }
+
+      // 更新状态更新时间
+      block.updateLastStatusUpdateTime();
     } catch (error) {
       console.error('Error updating block status:', error);
     }
@@ -293,11 +296,17 @@ export class BlockManager {
     this.onBlockStatusChange = callback;
   }
 
-  public update() {
+  public async update() {
     const now = Date.now();
 
     // 更新所有方块
-    this.blocks.forEach(block => block.update());
+    this.blocks.forEach(async block => {
+      block.update();
+      // 每隔一段时间更新一次交易状态
+      if (!block.isConfirmed() && now - block.getLastStatusUpdateTime() > GAME_CONFIG.BLOCK.STATUS_UPDATE_INTERVAL) {
+        await this.updateBlockStatus(block);
+      }
+    });
 
     // 更新和清理方块
     this.blocks = this.blocks.filter(block => {
