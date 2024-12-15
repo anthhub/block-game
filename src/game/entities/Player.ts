@@ -131,11 +131,16 @@ export class Player {
         case 's':
         case 'S':
           this.isPressingDown = true;
-          // 如果正在跳跃中，降低跳跃高度
+          // 增加向下的速度
+          Matter.Body.setVelocity(this.body, {
+            x: this.body.velocity.x,
+            y: Math.max(this.body.velocity.y, 8), // 设置最小下落速度
+          });
+          // 如果正在跳跃中，快速取消跳跃
           if (this.isJumping && this.body.velocity.y < 0) {
             Matter.Body.setVelocity(this.body, {
               x: this.body.velocity.x,
-              y: this.body.velocity.y * 0.5, // 降低向上的速度
+              y: 2, // 直接设置为向下速度
             });
           }
           break;
@@ -256,11 +261,11 @@ export class Player {
       this.isJumping = false;
     }
 
-    // 如果按下向下键，增加下落速度
-    if (this.isPressingDown && this.body.velocity.y > 0) {
+    // 如果按着向下键，持续增加下落速度
+    if (this.isPressingDown) {
       Matter.Body.setVelocity(this.body, {
         x: this.body.velocity.x,
-        y: this.body.velocity.y * 1.1, // 增加下落速度
+        y: Math.min(this.body.velocity.y + 0.5, 12), // 限制最大下落速度
       });
     }
 
