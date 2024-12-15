@@ -14,13 +14,11 @@ export class BlockManager {
   private provider: ethers.Provider;
   private blocks: Block[] = [];
   private txBuffer: ethers.TransactionResponse[] = [];
-  private lastSpawnTime: number = 0;
-  private baseSpawnInterval: number = 1000; // 基础生成间隔（毫秒）
-  private spawnIntervalRange: number = 200; // 生成间隔的随机范围（毫秒）
-  private nextSpawnInterval: number = 1000; // 下一个方块的生成间隔
-  private maxBufferSize: number = 20; // 交易缓冲区大小
+  private txStatus = new Map<string, number>();
+  private lastSpawnTime = Date.now();
+  private nextSpawnInterval = GAME_CONFIG.BLOCK.SPAWN_INTERVAL.BASE;
+  private maxBufferSize = 500; // 增加缓冲区大小到500
   private difficultyMultiplier: number = 1; // 难度系数
-  private txStatus: Map<string, number> = new Map(); // 存储交易哈希和状态 (1: 成功, 0: 失败, undefined: 待定)
   private particleSystem: ParticleSystem;
   private musicSystem: MusicSystem;
   private networkState = {
@@ -48,10 +46,10 @@ export class BlockManager {
   }
 
   private calculateNextSpawnInterval() {
-    const randomOffset = (Math.random() * 2 - 1) * this.spawnIntervalRange;
+    const randomOffset = (Math.random() * 2 - 1) * GAME_CONFIG.BLOCK.SPAWN_INTERVAL.VARIANCE;
     this.nextSpawnInterval = Math.max(
-      300,
-      (this.baseSpawnInterval + randomOffset) / this.difficultyMultiplier
+      GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MIN,
+      (GAME_CONFIG.BLOCK.SPAWN_INTERVAL.BASE + randomOffset) / this.difficultyMultiplier
     );
   }
 
@@ -69,10 +67,10 @@ export class BlockManager {
     setInterval(() => {
       this.provider.getBlock('pending').then(block => {
         if (block && block.transactions.length > 0) {
-          // 随机选择一些交易添加到缓冲区
+          // 随机选择更多交易添加到缓冲区
           const availableSpace = this.maxBufferSize - this.txBuffer.length;
           if (availableSpace > 0) {
-            const numToAdd = Math.min(availableSpace, 5);
+            const numToAdd = Math.min(availableSpace, 100); // 每次最多添加50个交易
             for (let i = 0; i < numToAdd; i++) {
               const randomIndex = Math.floor(Math.random() * block.transactions.length);
               const txHash = block.transactions[randomIndex];
@@ -85,7 +83,7 @@ export class BlockManager {
           }
         }
       });
-    }, 5000);
+    }, 1000); // 更新频率提高到1秒
   }
 
   private startRealtimeBlockchainEventListening() {
@@ -369,7 +367,10 @@ export class BlockManager {
 
     this.blocks.forEach(async block => {
       block.update();
-      if (!block.isConfirmed() && now - block.getLastStatusUpdateTime() > GAME_CONFIG.BLOCK.STATUS_UPDATE_INTERVAL) {
+      if (
+        !block.isConfirmed() &&
+        now - block.getLastStatusUpdateTime() > GAME_CONFIG.BLOCK.STATUS_UPDATE_INTERVAL
+      ) {
         await this.updateBlockStatus(block);
       }
     });
