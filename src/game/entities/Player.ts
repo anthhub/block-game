@@ -121,7 +121,6 @@ export class Player {
             y: this.body.velocity.y,
           });
           break;
-        case ' ':
         case 'ArrowUp':
         case 'w':
         case 'W':

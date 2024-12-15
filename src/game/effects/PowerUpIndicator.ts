@@ -28,8 +28,9 @@ export class PowerUpIndicator {
    * 显示道具效果
    * @param type 道具类型
    * @param duration 持续时间
+   * @param customText 自定义显示文本
    */
-  showEffect(type: string, duration: number) {
+  showEffect(type: string, duration: number, customText?: string) {
     let indicator = this.indicators.get(type);
 
     if (!indicator) {
@@ -49,50 +50,47 @@ export class PowerUpIndicator {
 
     // 清除之前的定时器（如果存在）
     if (indicator.timer) {
-      clearInterval(indicator.timer);
+      clearTimeout(indicator.timer);
     }
 
-    const startTime = Date.now();
-    const updateTimer = () => {
-      const remaining = Math.max(0, duration - (Date.now() - startTime));
+    // 根据道具类型显示不同的图标和文本
+    let text = '';
+    switch (type?.toUpperCase()) {
+      case 'LOWGRAVITY':
+      case 'LOW_GRAVITY':
+        text = '低重力模式';
+        break;
+      case 'SMALLSIZE':
+      case 'SMALL_SIZE':
+        text = '缩小模式';
+        break;
+      case 'INVINCIBILITY':
+        text = '无敌模式';
+        break;
+      case 'BLACKHOLEAVAILABLE':
+      case 'BLACK_HOLE_AVAILABLE':
+        text = customText || '黑洞效果已就绪';
+        break;
+      default:
+        text = type;
+    }
 
-      if (remaining <= 0) {
-        indicator!.style.animation = 'fadeOut 0.3s ease-in-out';
-        setTimeout(() => {
-          indicator!.remove();
-          this.indicators.delete(type);
-        }, 300);
-        clearInterval(indicator.timer);
-        return;
-      }
+    indicator.textContent = text;
 
-      // 添加图标和中文说明
-      let icon = '';
-      let name = '';
-      switch (type) {
-        case 'LowGravity':
-          icon = '🪶';
-          name = '低重力';
-          break;
-        case 'SmallSize':
-          icon = '🔍';
-          name = '缩小';
-          break;
-        case 'Invincibility':
-          icon = '⭐';
-          name = '无敌';
-          break;
-      }
-
-      const seconds = (remaining / 1000).toFixed(1);
-      indicator!.innerHTML = `${icon} ${name}: ${seconds}秒`;
-    };
-
-    // 立即更新一次
-    updateTimer();
-
-    // 每100ms更新一次
-    indicator.timer = setInterval(updateTimer, 100);
+    // 如果有持续时间，设置倒计时
+    if (duration > 0) {
+      const startTime = Date.now();
+      const updateTimer = () => {
+        const remaining = duration - (Date.now() - startTime);
+        if (remaining > 0) {
+          indicator.textContent = `${text} (${Math.ceil(remaining / 1000)}s)`;
+          requestAnimationFrame(updateTimer);
+        } else {
+          this.hideEffect(type);
+        }
+      };
+      updateTimer();
+    }
   }
 
   /**
@@ -114,5 +112,20 @@ export class PowerUpIndicator {
   destroy() {
     this.clear();
     this.container.remove();
+  }
+
+  /**
+   * 隐藏道具效果
+   * @param type 道具类型
+   */
+  hideEffect(type: string) {
+    const indicator = this.indicators.get(type);
+    if (indicator) {
+      indicator.style.animation = 'fadeOut 0.3s ease-in-out';
+      setTimeout(() => {
+        indicator.remove();
+        this.indicators.delete(type);
+      }, 300);
+    }
   }
 }

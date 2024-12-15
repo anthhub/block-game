@@ -6,6 +6,7 @@ import { isOutOfBounds } from '../../utils/physics';
 import { Player } from '../entities/Player';
 import { MusicSystem } from '../audio/MusicSystem';
 import { PowerUpIndicator } from '../effects/PowerUpIndicator';
+import { BlockManager } from '../managers/BlockManager';
 
 /**
  * 能力增强道具管理器
@@ -22,17 +23,24 @@ export class PowerUpManager {
   private powerUpIndicator: PowerUpIndicator;
   private player: Player; // player对象
   private musicSystem: MusicSystem; // 音乐系统对象
+  private spaceClickCount: number = 0;
+  private lastSpaceClickTime: number = 0;
+  private blackHoleAvailable: boolean = false;
+  private blockManager?: BlockManager;
 
   constructor(
     engine: Matter.Engine,
     powerUpIndicator: PowerUpIndicator,
     player: Player,
-    musicSystem: MusicSystem
+    musicSystem: MusicSystem,
+    blockManager: BlockManager
   ) {
     this.engine = engine;
     this.powerUpIndicator = powerUpIndicator;
     this.player = player;
     this.musicSystem = musicSystem;
+    this.blockManager = blockManager;
+    this.setupBlackHoleListener();
   }
 
   /**
@@ -145,7 +153,10 @@ export class PowerUpManager {
    * 根据配置的生成概率随机生成
    */
   public spawnPowerUp() {
-    if (this.powerUps.length < GAME_CONFIG.POWER_UPS.MAX_POWER_UPS && Math.random() < GAME_CONFIG.POWER_UPS.SPAWN_CHANCE) {
+    if (
+      this.powerUps.length < GAME_CONFIG.POWER_UPS.MAX_POWER_UPS &&
+      Math.random() < GAME_CONFIG.POWER_UPS.SPAWN_CHANCE
+    ) {
       const type = Math.floor((Math.random() * Object.keys(PowerUpType).length) / 2) as PowerUpType;
       const x = Math.random() * (window.innerWidth - 100) + 50;
       const y = 50;
@@ -184,5 +195,65 @@ export class PowerUpManager {
     this.powerUps.forEach(powerUp => powerUp.remove(this.engine));
     this.powerUps = [];
     this.activeEffects = [];
+  }
+
+  private setupBlackHoleListener() {
+    document.addEventListener('keydown', event => {
+      if (event.code === 'Space' && this.blackHoleAvailable) {
+        const currentTime = Date.now();
+
+        // 检查是否超时
+        if (
+          currentTime - this.lastSpaceClickTime >
+          GAME_CONFIG.POWER_UPS.BLACK_HOLE.CLICK_TIMEOUT
+        ) {
+          this.spaceClickCount = 0;
+        }
+
+        this.spaceClickCount++;
+        this.lastSpaceClickTime = currentTime;
+
+        // 达到所需点击次数
+        if (this.spaceClickCount >= GAME_CONFIG.POWER_UPS.BLACK_HOLE.SPACE_CLICKS_REQUIRED) {
+          this.triggerBlackHole();
+          this.spaceClickCount = 0;
+          this.blackHoleAvailable = false;
+        }
+      }
+    });
+  }
+
+  public checkNetworkCongestion(pendingTxCount: number) {
+    console.log('Checking congestion:', {
+      pendingTxCount,
+      threshold: GAME_CONFIG.POWER_UPS.BLACK_HOLE.CONGESTION_THRESHOLD,
+      blackHoleAvailable: this.blackHoleAvailable,
+    });
+
+    if (
+      !this.blackHoleAvailable &&
+      pendingTxCount > GAME_CONFIG.POWER_UPS.BLACK_HOLE.CONGESTION_THRESHOLD
+    ) {
+      console.log('Black hole becoming available!');
+      this.blackHoleAvailable = true;
+      this.powerUpIndicator.showEffect('BLACK_HOLE_AVAILABLE', 0, '黑洞已就绪！按空格键触发');
+    } else {
+      console.log('Black hole becoming available!');
+    }
+  }
+
+  // 测试用：手动触发黑洞
+  public testTriggerBlackHole() {
+    console.log('Manually triggering black hole');
+    this.blackHoleAvailable = true;
+    this.powerUpIndicator.showEffect('BLACK_HOLE_AVAILABLE', 0, '黑洞已就绪！按空格键触发');
+  }
+
+  private triggerBlackHole() {
+    if (this.blockManager) {
+      this.blockManager.testBlackHoleEffect();
+      this.powerUpIndicator.hideEffect('BLACK_HOLE_AVAILABLE');
+      this.musicSystem.playSound('powerUp');
+    }
   }
 }

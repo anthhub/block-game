@@ -5,6 +5,7 @@ import { createProvider } from '../../utils/blockchain';
 import { GAME_CONFIG } from '../../config/constants';
 import { ParticleSystem } from '../effects/ParticleSystem';
 import { MusicSystem } from '../audio/MusicSystem';
+import { PowerUpManager } from '../managers/PowerUpManager';
 
 /**
  * 管理游戏中所有的方块
@@ -18,10 +19,11 @@ export class BlockManager {
   private lastSpawnTime = Date.now();
   private nextSpawnInterval = GAME_CONFIG.BLOCK.SPAWN_INTERVAL.BASE;
   private baseSpawnInterval = GAME_CONFIG.BLOCK.SPAWN_INTERVAL.BASE;
-  private maxBufferSize = 500; // 增加缓冲区大小到500
+  private maxBufferSize = 200; // 增加缓冲区大小到200
   private difficultyMultiplier: number = 1; // 难度系数
   private particleSystem: ParticleSystem;
   private musicSystem: MusicSystem;
+  public powerUpManager?: PowerUpManager;
   private networkState = {
     gasPrice: 0,
     pendingTxCount: 0,
@@ -36,11 +38,12 @@ export class BlockManager {
   private onBlockStatusChange?: (block: Block) => void;
   private canDestroyBlocks: boolean = false;
 
-  constructor(engine: Matter.Engine, musicSystem: MusicSystem) {
+  constructor(engine: Matter.Engine, musicSystem: MusicSystem, powerUpManager?: PowerUpManager) {
     this.engine = engine;
     this.provider = createProvider();
     this.particleSystem = new ParticleSystem(engine);
     this.musicSystem = musicSystem;
+    this.powerUpManager = powerUpManager;
     this.setupBlockchainListener();
     this.calculateNextSpawnInterval();
     this.startRealtimeBlockchainEventListening();
@@ -50,10 +53,7 @@ export class BlockManager {
     const randomOffset = (Math.random() * 2 - 1) * GAME_CONFIG.BLOCK.SPAWN_INTERVAL.VARIANCE;
     this.nextSpawnInterval = Math.max(
       GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MIN,
-      Math.min(
-        GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MAX,
-        this.baseSpawnInterval * (1 + randomOffset)
-      )
+      Math.min(GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MAX, this.baseSpawnInterval * (1 + randomOffset))
     );
   }
 
@@ -74,7 +74,7 @@ export class BlockManager {
           // 随机选择更多交易添加到缓冲区
           const availableSpace = this.maxBufferSize - this.txBuffer.length;
           if (availableSpace > 0) {
-            const numToAdd = Math.min(availableSpace, 100); // 每次最多添加50个交易
+            const numToAdd = Math.min(availableSpace, 20); // 每次最多添加50个交易
             for (let i = 0; i < numToAdd; i++) {
               const randomIndex = Math.floor(Math.random() * block.transactions.length);
               const txHash = block.transactions[randomIndex];
@@ -152,20 +152,6 @@ export class BlockManager {
     // 可以在玩家类中添加相应的处理逻辑
   }
 
-  private async getTransactionStatus(txHash: string): Promise<number | undefined> {
-    try {
-      const receipt = await this.provider.getTransactionReceipt(txHash);
-      if (receipt) {
-        console.log(`Transaction ${txHash} receipt:`, receipt);
-        return receipt.status;
-      }
-      return undefined;
-    } catch (error) {
-      console.error(`获取交易状态失败: ${txHash}`, error);
-      return undefined;
-    }
-  }
-
   /**
    * 立即更新指定方块的交易状态
    */
@@ -212,7 +198,7 @@ export class BlockManager {
     block.turnBlack();
 
     // 获取周围的方块
-    const radius = 100;
+    const radius = 500;
     const blockPos = block.body.position;
     const nearbyBodies = Matter.Query.region(this.engine.world.bodies, {
       min: { x: blockPos.x - radius, y: blockPos.y - radius },
@@ -237,67 +223,28 @@ export class BlockManager {
   }
 
   /**
-   * 开始监控网络状态
-   */
-  private async startNetworkMonitoring() {
-    const updateNetworkState = async () => {
-      try {
-        const now = Date.now();
-        if (now - this.networkState.lastUpdate < this.networkState.updateInterval) {
-          return;
-        }
-
-        // 获取当前gas价格 (ethers v6)
-        const feeData = await this.provider.getFeeData();
-        this.networkState.gasPrice = parseFloat(ethers.formatUnits(feeData.gasPrice || 0n, 'gwei'));
-
-        // 获取待处理交易数量
-        const pendingTxCount = await this.provider.getTransactionCount('pending');
-        this.networkState.pendingTxCount = pendingTxCount;
-        // 计算网络拥堵程度 (0-1)
-        const congestionLevel = this.calculateCongestionLevel();
-
-        // 调整游戏参数
-        this.adjustGameParameters(congestionLevel);
-
-        this.networkState.lastUpdate = now;
-
-        // 触发状态变化回调
-        if (this.onNetworkStateChange) {
-          this.onNetworkStateChange({
-            gasPrice: this.networkState.gasPrice,
-            pendingTxCount: this.networkState.pendingTxCount,
-            congestionLevel,
-          });
-        }
-      } catch (error) {
-        console.error('更新网络状态失败:', error);
-      }
-    };
-
-    // 立即更新一次
-    await updateNetworkState();
-
-    // 定期更新
-    setInterval(updateNetworkState, this.networkState.updateInterval);
-  }
-
-  /**
    * 计算网络拥堵程度 (0-1)
    */
   private calculateCongestionLevel(): number {
     const { MAX_GAS_PRICE, MAX_PENDING_TX, CONGESTION_WEIGHTS } = GAME_CONFIG.PHYSICS.NETWORK;
 
-    // Gas价格评分 (0-1)
-    const gasScore = Math.min(this.networkState.gasPrice / MAX_GAS_PRICE, 1);
+    // Gas价格评分 (0-1)，使用更敏感的计算方式
+    const gasScore = Math.min((this.networkState.gasPrice / MAX_GAS_PRICE) * 2, 1);
 
-    // 待处理交易评分 (0-1)
-    const pendingScore = Math.min(this.networkState.pendingTxCount / MAX_PENDING_TX, 1);
+    // 待处理交易评分 (0-1)，使用更敏感的计算方式
+    const pendingScore = Math.min((this.networkState.pendingTxCount / MAX_PENDING_TX) * 2, 1);
 
-    // 根据权重计算综合拥堵度
-    return (
-      gasScore * CONGESTION_WEIGHTS.GAS_PRICE + pendingScore * CONGESTION_WEIGHTS.PENDING_TX
+    // 使用更高的基础拥堵度
+    const baseCongestion = 0.02; // 添加基础拥堵度
+
+    // 根据权重计算综合拥堵度，并加上基础拥堵度
+    const finalCongestion = Math.min(
+      baseCongestion +
+        (gasScore * CONGESTION_WEIGHTS.GAS_PRICE + pendingScore * CONGESTION_WEIGHTS.PENDING_TX),
+      1
     );
+
+    return finalCongestion;
   }
 
   /**
@@ -451,36 +398,41 @@ export class BlockManager {
   }
 
   private async updateNetworkState() {
-    const now = Date.now();
-
-    // 每隔一段时间更新一次网络状态
-    if (now - this.networkState.lastUpdate >= this.networkState.updateInterval) {
-      try {
-        // 获取当前gas价格
-        const feeData = await this.provider.getFeeData();
-        if (feeData.gasPrice) {
-          this.networkState.gasPrice = Number(feeData.gasPrice);
-        }
-
-        // 获取pending交易数量
-        const block = await this.provider.getBlock('pending');
-        if (block) {
-          this.networkState.pendingTxCount = block.transactions.length;
-        }
-
-        this.networkState.lastUpdate = now;
-
-        // 触发回调
-        if (this.onNetworkStateChange) {
-          this.onNetworkStateChange({
-            gasPrice: this.networkState.gasPrice,
-            pendingTxCount: this.networkState.pendingTxCount,
-            congestionLevel: this.calculateCongestionLevel(),
-          });
-        }
-      } catch (error) {
-        console.error('更新网络状态失败:', error);
+    try {
+      // 获取当前 gas 价格
+      const feeData = await this.provider.getFeeData();
+      if (feeData.gasPrice) {
+        this.networkState.gasPrice = Number(ethers.formatUnits(feeData.gasPrice, 'gwei'));
       }
+
+      // 获取待处理交易数量
+      const blockNumber = await this.provider.getBlockNumber();
+      const block = await this.provider.getBlock(blockNumber);
+      if (block) {
+        this.networkState.pendingTxCount = block.transactions.length;
+      }
+
+      // 计算拥堵程度
+      const congestionLevel = this.calculateCongestionLevel();
+
+      // 通知 PowerUpManager 检查拥堵状态
+      if (this.powerUpManager) {
+        this.powerUpManager.checkNetworkCongestion(this.networkState.pendingTxCount);
+      }
+
+      // 调整游戏参数
+      this.adjustGameParameters(congestionLevel);
+
+      // 触发回调
+      if (this.onNetworkStateChange) {
+        this.onNetworkStateChange({
+          gasPrice: this.networkState.gasPrice,
+          pendingTxCount: this.networkState.pendingTxCount,
+          congestionLevel,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update network state:', error);
     }
   }
 

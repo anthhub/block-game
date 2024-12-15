@@ -15,7 +15,7 @@ export const GAME_CONFIG = {
   PHYSICS: {
     GRAVITY: {
       BASE: 0.0004, // 进一步减小基础重力
-      MAX: 0.001,  // 进一步减小最大重力
+      MAX: 0.001, // 进一步减小最大重力
       MIN: 0.0002, // 进一步减小最小重力
       SCALE_FACTOR: 1.2, // 进一步减小重力缩放因子
     },
@@ -29,7 +29,7 @@ export const GAME_CONFIG = {
       },
     },
     DEFAULT_GRAVITY: 0.15, // 进一步减小默认重力
-    LOW_GRAVITY: 0.05,    // 进一步减小低重力值
+    LOW_GRAVITY: 0.05, // 进一步减小低重力值
     MIN_FALLING_SPEED: 0.5, // 进一步减小最小下落速度
   },
   POWER_UPS: {
@@ -37,9 +37,14 @@ export const GAME_CONFIG = {
     SPAWN_CHANCE: 0.6, // 增加道具出现概率
     MAX_POWER_UPS: 3, // 保持最大道具数量为3
     DURATIONS: {
-      LOW_GRAVITY: 8000,    // 增加到8秒
-      SMALL_SIZE: 6000,     // 增加到6秒
-      INVINCIBILITY: 4000,  // 增加到4秒
+      LOW_GRAVITY: 8000, // 增加到8秒
+      SMALL_SIZE: 6000, // 增加到6秒
+      INVINCIBILITY: 4000, // 增加到4秒
+    },
+    BLACK_HOLE: {
+      CONGESTION_THRESHOLD: 100, // 降低触发阈值到5%，让黑洞更容易出现
+      SPACE_CLICKS_REQUIRED: 1, // 减少所需点击次数到1次
+      CLICK_TIMEOUT: 3000, // 增加超时时间到1秒，给玩家更多反应时间
     },
   },
   BLOCK: {

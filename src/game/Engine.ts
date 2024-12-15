@@ -77,12 +77,25 @@ export class Engine {
       document.getElementById('game-canvas') as HTMLCanvasElement
     );
 
+    // 创建玩家
+    this.player = new Player(this.engine, this.blockManager, this.musicSystem);
+
     // 创建区块管理器
     this.blockManager = new BlockManager(this.engine, this.musicSystem);
     this.blockManager.setNetworkStateChangeCallback(this.onNetworkStateChange.bind(this));
 
-    // 创建玩家
-    this.player = new Player(this.engine, this.blockManager, this.musicSystem);
+    // 创建游戏组件
+    this.particleSystem = new ParticleSystem(this.engine);
+    this.powerUpIndicator = new PowerUpIndicator();
+    this.powerUpManager = new PowerUpManager(
+      this.engine,
+      this.powerUpIndicator,
+      this.player,
+      this.musicSystem,
+      this.blockManager
+    );
+
+    this.blockManager.powerUpManager = this.powerUpManager;
 
     // 设置区块状态变化回调
     this.blockManager.setBlockStatusChangeCallback(block => {
@@ -101,19 +114,6 @@ export class Engine {
       }
     });
 
-    // 创建游戏组件
-    this.particleSystem = new ParticleSystem(this.engine);
-    this.powerUpIndicator = new PowerUpIndicator();
-    this.powerUpManager = new PowerUpManager(
-      this.engine,
-      this.powerUpIndicator,
-      this.player,
-      this.musicSystem
-    );
-
-    // 监听网络状态变化
-    this.blockManager.setNetworkStateChangeCallback(this.onNetworkStateChange.bind(this));
-
     // 创建交易信息提示框
     this.createTooltip();
 
@@ -122,6 +122,7 @@ export class Engine {
 
     // 设置事件监听器
     this.setupEventListeners();
+    this.setupKeyboardEvents();
 
     // 创建物理引擎运行器
     this.runner = Matter.Runner.create();
@@ -138,9 +139,6 @@ export class Engine {
       this.musicSystem.initialize();
     }, 1000);
 
-    // 设置UI
-    this.setupUI();
-
     // 设置初始网络状态
     this.updateNetworkStatus();
 
@@ -156,49 +154,14 @@ export class Engine {
     });
   }
 
-  private setupUI() {
-    // 创建测试按钮
-    // const testButton = document.createElement('button');
-    // testButton.textContent = '测试黑洞效果';
-    // testButton.style.position = 'fixed';
-    // testButton.style.top = '10px';
-    // testButton.style.right = '10px';
-    // testButton.style.zIndex = '1000';
-    // testButton.style.padding = '8px 16px';
-    // testButton.style.backgroundColor = '#4CAF50';
-    // testButton.style.color = 'white';
-    // testButton.style.border = 'none';
-    // testButton.style.borderRadius = '4px';
-    // testButton.style.cursor = 'pointer';
-    // testButton.addEventListener('click', () => {
-    //   this.blockManager.testBlackHoleEffect();
+  private setupKeyboardEvents() {
+    // window.addEventListener('keydown', event => {
+    //   // 测试用：按T键触发黑洞
+    //   if (event.key === 't' || event.key === 'T') {
+    //     console.log('Test key pressed, triggering black hole');
+    //     this.powerUpManager.testTriggerBlackHole();
+    //   }
     // });
-    // document.body.appendChild(testButton);
-  }
-
-  /**
-   * 添加音乐控制按钮
-   */
-  private addMusicButton(): void {
-    const button = document.createElement('button');
-    button.textContent = '开始音乐';
-    button.style.position = 'fixed';
-    button.style.top = '10px';
-    button.style.right = '150px';
-    button.style.zIndex = '1000';
-    button.style.padding = '8px 16px';
-    button.style.backgroundColor = '#4CAF50';
-    button.style.color = 'white';
-    button.style.border = 'none';
-    button.style.borderRadius = '4px';
-    button.style.cursor = 'pointer';
-
-    button.addEventListener('click', () => {
-      this.musicSystem.initialize();
-      button.style.display = 'none';
-    });
-
-    document.body.appendChild(button);
   }
 
   /**

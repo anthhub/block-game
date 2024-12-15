@@ -234,6 +234,17 @@ export class MusicSystem {
     updateVolume();
   }
 
+  /**
+   * 播放音效
+   * @param soundName 音效名称
+   */
+  public playSound(soundName: 'collision' | 'powerUp' | 'blockConfirm' | 'jump' | 'gameOver' | 'death' | 'levelUp' | 'score') {
+    const sound = this.sfx[soundName];
+    if (sound) {
+      sound.play();
+    }
+  }
+
   // 音效播放方法
   public playCollisionSound(): void {
     if (this.sfx.collision.state() === 'loaded') {
