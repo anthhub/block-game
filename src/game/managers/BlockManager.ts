@@ -17,6 +17,7 @@ export class BlockManager {
   private txStatus = new Map<string, number>();
   private lastSpawnTime = Date.now();
   private nextSpawnInterval = GAME_CONFIG.BLOCK.SPAWN_INTERVAL.BASE;
+  private baseSpawnInterval = GAME_CONFIG.BLOCK.SPAWN_INTERVAL.BASE;
   private maxBufferSize = 500; // 增加缓冲区大小到500
   private difficultyMultiplier: number = 1; // 难度系数
   private particleSystem: ParticleSystem;
@@ -49,7 +50,10 @@ export class BlockManager {
     const randomOffset = (Math.random() * 2 - 1) * GAME_CONFIG.BLOCK.SPAWN_INTERVAL.VARIANCE;
     this.nextSpawnInterval = Math.max(
       GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MIN,
-      (GAME_CONFIG.BLOCK.SPAWN_INTERVAL.BASE + randomOffset) / this.difficultyMultiplier
+      Math.min(
+        GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MAX,
+        this.baseSpawnInterval * (1 + randomOffset)
+      )
     );
   }
 
@@ -291,7 +295,9 @@ export class BlockManager {
     const pendingScore = Math.min(this.networkState.pendingTxCount / MAX_PENDING_TX, 1);
 
     // 根据权重计算综合拥堵度
-    return gasScore * CONGESTION_WEIGHTS.GAS_PRICE + pendingScore * CONGESTION_WEIGHTS.PENDING_TX;
+    return (
+      gasScore * CONGESTION_WEIGHTS.GAS_PRICE + pendingScore * CONGESTION_WEIGHTS.PENDING_TX
+    );
   }
 
   /**
@@ -501,7 +507,10 @@ export class BlockManager {
   }
 
   public setBaseSpawnInterval(interval: number) {
-    this.baseSpawnInterval = Math.max(500, Math.min(2000, interval));
+    this.baseSpawnInterval = Math.max(
+      GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MIN,
+      Math.min(GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MAX, interval)
+    );
     this.calculateNextSpawnInterval();
   }
 
