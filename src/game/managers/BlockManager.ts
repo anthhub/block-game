@@ -6,6 +6,7 @@ import { GAME_CONFIG } from '../../config/constants';
 import { ParticleSystem } from '../effects/ParticleSystem';
 import { MusicSystem } from '../audio/MusicSystem';
 import { PowerUpManager } from '../managers/PowerUpManager';
+import { useGameStore } from '../../store/gameStore';
 
 /**
  * 管理游戏中所有的方块
@@ -50,10 +51,24 @@ export class BlockManager {
   }
 
   private calculateNextSpawnInterval() {
+    // Get current score for difficulty scaling
+    const currentScore = useGameStore.getState().score;
+    const difficultyConfig = GAME_CONFIG.BLOCK.DIFFICULTY;
+    
+    // Calculate speed scale based on score
+    const scoreMultiplier = Math.floor(currentScore / difficultyConfig.SCORE_INTERVAL);
+    const speedScale = Math.min(
+      difficultyConfig.MAX_SPEED_SCALE,
+      difficultyConfig.SPEED_SCALE_BASE + (scoreMultiplier * difficultyConfig.SPEED_SCALE_PER_SCORE)
+    );
+
+    // Apply speed scale to spawn interval
+    const baseInterval = this.baseSpawnInterval / speedScale;
     const randomOffset = (Math.random() * 2 - 1) * GAME_CONFIG.BLOCK.SPAWN_INTERVAL.VARIANCE;
+    
     this.nextSpawnInterval = Math.max(
       GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MIN,
-      Math.min(GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MAX, this.baseSpawnInterval * (1 + randomOffset))
+      Math.min(GAME_CONFIG.BLOCK.SPAWN_INTERVAL.MAX, baseInterval * (1 + randomOffset))
     );
   }
 

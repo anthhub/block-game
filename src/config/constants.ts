@@ -57,6 +57,12 @@ export const GAME_CONFIG = {
       MAX: 500, // 增加最大生成间隔
       VARIANCE: 0.8, // 增加随机变化范围
     },
+    DIFFICULTY: {
+      SPEED_SCALE_BASE: 1.0, // 基础速度系数
+      SPEED_SCALE_PER_SCORE: 0.05, // 每得一分增加的速度系数
+      MAX_SPEED_SCALE: 5.0, // 最大速度系数
+      SCORE_INTERVAL: 1, // 每多少分增加一次难度
+    },
     STATUS_UPDATE_INTERVAL: 5000, // 区块状态更新间隔 (ms)
     GAS_PRICE_THRESHOLDS: {
       HIGH: 100,
