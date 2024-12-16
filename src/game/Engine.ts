@@ -330,6 +330,12 @@ export class Engine {
   /**
    * 处理游戏结束
    */
+  /**
+   * 处理游戏结束
+   * 如果游戏已经结束则返回
+   * 否则，停止游戏物理引擎和渲染，创建游戏结束特效，播放游戏结束音效
+   * 并显示游戏结束画面
+   */
   public gameOver() {
     if (this.isGameOver) return;
 

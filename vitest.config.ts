@@ -5,4 +5,5 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
   },
+  envPrefix: 'VITE_',
 });

@@ -19,7 +19,7 @@ export class BlockManager {
   private lastSpawnTime = Date.now();
   private nextSpawnInterval = GAME_CONFIG.BLOCK.SPAWN_INTERVAL.BASE;
   private baseSpawnInterval = GAME_CONFIG.BLOCK.SPAWN_INTERVAL.BASE;
-  private maxBufferSize = 200; // 增加缓冲区大小到200
+  private maxBufferSize = 500; // 增加缓冲区大小到500
   private difficultyMultiplier: number = 1; // 难度系数
   private particleSystem: ParticleSystem;
   private musicSystem: MusicSystem;
@@ -74,7 +74,7 @@ export class BlockManager {
           // 随机选择更多交易添加到缓冲区
           const availableSpace = this.maxBufferSize - this.txBuffer.length;
           if (availableSpace > 0) {
-            const numToAdd = Math.min(availableSpace, 20); // 每次最多添加50个交易
+            const numToAdd = Math.min(availableSpace, 50); // 每次最多添加50个交易
             for (let i = 0; i < numToAdd; i++) {
               const randomIndex = Math.floor(Math.random() * block.transactions.length);
               const txHash = block.transactions[randomIndex];

@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { createProvider } from '../utils/blockchain';
 
 export class BlockchainService {
   private provider: ethers.JsonRpcProvider;
@@ -6,9 +7,7 @@ export class BlockchainService {
   private lastBlockNumber: number = 0;
 
   constructor() {
-    this.provider = new ethers.JsonRpcProvider(
-      'https://eth-mainnet.g.alchemy.com/v2/ShFElt5V8pPaMbA4djojAo4b1ndF3vIa'
-    );
+    this.provider = createProvider();
   }
 
   /**

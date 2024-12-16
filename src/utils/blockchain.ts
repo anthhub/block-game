@@ -5,16 +5,24 @@ interface BlockDimensions {
   width: number;
   height: number;
   vertices?: Matter.Vector[];
-  shape: 'rectangle' | 'polygon' | 'circle' | 'star' | 'diamond' | 'triangle' | 'cross' | 'hexagram';
+  shape:
+    | 'rectangle'
+    | 'polygon'
+    | 'circle'
+    | 'star'
+    | 'diamond'
+    | 'triangle'
+    | 'cross'
+    | 'hexagram';
 }
 
 interface BlockPhysics {
-  size: number;           // 方块大小
-  speed: number;         // 下落速度
-  spin: number;         // 旋转速度
-  density: number;      // 密度
+  size: number; // 方块大小
+  speed: number; // 下落速度
+  spin: number; // 旋转速度
+  density: number; // 密度
   restitution: number; // 弹性
-  friction: number;    // 摩擦力
+  friction: number; // 摩擦力
   vertices?: Matter.Vector[]; // 顶点（用于特殊形状）
 }
 
@@ -33,77 +41,86 @@ export const calculateBlockDimensions = (tx: ethers.TransactionResponse): BlockD
   const dataSize = (tx.data?.length || 0) / 2 - 1;
 
   // 归一化各个参数 (0-1范围)，使用指数函数增加差异
-  const normalizedGas = Math.pow(Math.min(gasPrice / (500 * 1e9), 1), 0.5);  // 使用平方根增加小值的权重
+  const normalizedGas = Math.pow(Math.min(gasPrice / (500 * 1e9), 1), 0.5); // 使用平方根增加小值的权重
   const normalizedValue = Math.pow(Math.min(value / (100 * 1e18), 1), 0.5);
   const normalizedData = Math.pow(Math.min(dataSize / 10000, 1), 0.5);
 
   // 计算基础大小，增加权重差异
-  const baseSize = GAME_CONFIG.BLOCK.MIN_SIZE + 
-    (GAME_CONFIG.BLOCK.MAX_SIZE - GAME_CONFIG.BLOCK.MIN_SIZE) * 
-    (normalizedGas * 0.5 + normalizedValue * 0.4 + normalizedData * 0.1);
+  const baseSize =
+    GAME_CONFIG.BLOCK.MIN_SIZE +
+    (GAME_CONFIG.BLOCK.MAX_SIZE - GAME_CONFIG.BLOCK.MIN_SIZE) *
+      (normalizedGas * 0.5 + normalizedValue * 0.4 + normalizedData * 0.1);
 
   // 添加随机变化因子，进一步增加大小差异
   const randomFactor = 0.8 + Math.random() * 0.4; // 0.8-1.2的随机系数
   const finalSize = baseSize * randomFactor;
 
   // 根据交易类型决定形状
-  let shape: 'rectangle' | 'polygon' | 'circle' | 'star' | 'diamond' | 'triangle' | 'cross' | 'hexagram' = 'rectangle';
+  let shape:
+    | 'rectangle'
+    | 'polygon'
+    | 'circle'
+    | 'star'
+    | 'diamond'
+    | 'triangle'
+    | 'cross'
+    | 'hexagram' = 'rectangle';
   let dimensions: BlockDimensions = {
     width: finalSize,
     height: finalSize,
-    shape: 'rectangle'
+    shape: 'rectangle',
   };
 
   // 高价值交易 - 使用巨大的菱形，给人强烈的压迫感
   if (normalizedValue > 0.2) {
     shape = 'diamond';
-    const size = finalSize * 5;  // 最大尺寸，5倍
+    const size = finalSize * 5; // 最大尺寸，5倍
     dimensions.vertices = [
-      { x: 0, y: -size },          // 更尖锐的顶部
-      { x: size/1.8, y: 0 },
-      { x: 0, y: size/1.2 },       // 较短的底部
-      { x: -size/1.8, y: 0 }
+      { x: 0, y: -size }, // 更尖锐的顶部
+      { x: size / 1.8, y: 0 },
+      { x: 0, y: size / 1.2 }, // 较短的底部
+      { x: -size / 1.8, y: 0 },
     ];
   }
   // 高Gas交易 - 使用大号三角形，表示危险
   else if (normalizedGas > 0.4) {
     shape = 'triangle';
-    const size = finalSize * 4.5;   // 4.5倍大小
+    const size = finalSize * 4.5; // 4.5倍大小
     dimensions.vertices = [
-      { x: 0, y: -size },          // 尖锐的顶部
-      { x: size/1.2, y: size/1.2 },
-      { x: -size/1.2, y: size/1.2 }
+      { x: 0, y: -size }, // 尖锐的顶部
+      { x: size / 1.2, y: size / 1.2 },
+      { x: -size / 1.2, y: size / 1.2 },
     ];
   }
   // 合约创建交易 - 使用大型十六边形
   else if (!tx.to) {
     shape = 'polygon';
-    const radius = finalSize * 4;  // 4倍大小
+    const radius = finalSize * 4; // 4倍大小
     dimensions.vertices = Array.from({ length: 16 }, (_, i) => ({
-      x: radius * Math.cos(i * Math.PI / 8),
-      y: radius * Math.sin(i * Math.PI / 8)
+      x: radius * Math.cos((i * Math.PI) / 8),
+      y: radius * Math.sin((i * Math.PI) / 8),
     }));
   }
   // ERC20转账 - 使用中等圆形
   else if (tx.data.startsWith('0xa9059cbb') || tx.data.startsWith('0x23b872dd')) {
     shape = 'circle';
-    dimensions.width = finalSize * 3;   // 3倍大小
+    dimensions.width = finalSize * 3; // 3倍大小
     dimensions.height = finalSize * 3;
   }
   // ERC721 NFT转账 - 使用中型六芒星
   else if (tx.data.startsWith('0x42842e0e')) {
     shape = 'hexagram';
-    const outerRadius = finalSize * 2.8;  // 2.8倍大小
+    const outerRadius = finalSize * 2.8; // 2.8倍大小
     const innerRadius = outerRadius * 0.4;
     const points: Matter.Vector[] = [];
-    
+
     // 创建六芒星（两个交错的三角形）
     for (let i = 0; i < 6; i++) {
-      const angle = i * Math.PI / 3;
+      const angle = (i * Math.PI) / 3;
       const radius = i % 2 === 0 ? outerRadius : innerRadius;
       points.push({
         x: radius * Math.cos(angle),
-        y: radius * Math.sin(angle)
+        y: radius * Math.sin(angle),
       });
     }
     dimensions.vertices = points;
@@ -111,23 +128,23 @@ export const calculateBlockDimensions = (tx: ethers.TransactionResponse): BlockD
   // 大数据交易 - 使用中型十字形
   else if (normalizedData > 0.3) {
     shape = 'cross';
-    const baseScale = finalSize * 2.5;  // 2.5倍基础大小
-    const armWidth = baseScale * 0.2;   // 较细的手臂
-    const armLength = baseScale * 1.2;  // 较长的手臂
+    const baseScale = finalSize * 2.5; // 2.5倍基础大小
+    const armWidth = baseScale * 0.2; // 较细的手臂
+    const armLength = baseScale * 1.2; // 较长的手臂
     dimensions.vertices = [
       // 垂直臂
-      { x: -armWidth/2, y: -armLength },
-      { x: armWidth/2, y: -armLength },
-      { x: armWidth/2, y: -armWidth/2 },
-      { x: armLength, y: -armWidth/2 },
-      { x: armLength, y: armWidth/2 },
-      { x: armWidth/2, y: armWidth/2 },
-      { x: armWidth/2, y: armLength },
-      { x: -armWidth/2, y: armLength },
-      { x: -armWidth/2, y: armWidth/2 },
-      { x: -armLength, y: armWidth/2 },
-      { x: -armLength, y: -armWidth/2 },
-      { x: -armWidth/2, y: -armWidth/2 }
+      { x: -armWidth / 2, y: -armLength },
+      { x: armWidth / 2, y: -armLength },
+      { x: armWidth / 2, y: -armWidth / 2 },
+      { x: armLength, y: -armWidth / 2 },
+      { x: armLength, y: armWidth / 2 },
+      { x: armWidth / 2, y: armWidth / 2 },
+      { x: armWidth / 2, y: armLength },
+      { x: -armWidth / 2, y: armLength },
+      { x: -armWidth / 2, y: armWidth / 2 },
+      { x: -armLength, y: armWidth / 2 },
+      { x: -armLength, y: -armWidth / 2 },
+      { x: -armWidth / 2, y: -armWidth / 2 },
     ];
   }
   // 普通交易 - 使用小型矩形
@@ -159,26 +176,26 @@ export const calculateBlockPhysics = (tx: ethers.TransactionResponse): BlockPhys
   const isBigData = dataSize > 5000; // 大于5000字节
 
   // 归一化值到0-1范围，但使用更极端的阈值
-  const normalizedGas = Math.min(gasPrice / (1000 * 1e9), 1);  // 最高1000 Gwei
-  const normalizedValue = Math.min(value / (200 * 1e18), 1);   // 最高200 ETH
-  const normalizedData = Math.min(dataSize / 20000, 1);        // 最高20000字节
-  const normalizedNonce = Math.min(nonce / 200, 1);            // 最高200
-  const normalizedGasLimit = Math.min(gasLimit / (2000000), 1); // 最高2M gas
+  const normalizedGas = Math.min(gasPrice / (1000 * 1e9), 1); // 最高1000 Gwei
+  const normalizedValue = Math.min(value / (200 * 1e18), 1); // 最高200 ETH
+  const normalizedData = Math.min(dataSize / 20000, 1); // 最高20000字节
+  const normalizedNonce = Math.min(nonce / 200, 1); // 最高200
+  const normalizedGasLimit = Math.min(gasLimit / 2000000, 1); // 最高2M gas
 
   // 基础大小 (3-8倍)，让差异更明显
   const baseSize = GAME_CONFIG.BLOCK.MIN_SIZE * (3 + normalizedValue * 5);
-  
+
   let vertices: Matter.Vector[] | undefined;
-  
+
   // 根据交易类型决定形状，更夸张的形状
   if (isHighValue) {
     // 超大钻石形（高价值交易）
     const size = baseSize * 1.5;
     vertices = [
-      { x: 0, y: -size * 1.2 },      // 更尖的顶部
+      { x: 0, y: -size * 1.2 }, // 更尖的顶部
       { x: size * 0.8, y: 0 },
       { x: 0, y: size * 0.8 },
-      { x: -size * 0.8, y: 0 }
+      { x: -size * 0.8, y: 0 },
     ];
   } else if (isContract) {
     // 不规则十二边形（合约创建）
@@ -188,7 +205,7 @@ export const calculateBlockPhysics = (tx: ethers.TransactionResponse): BlockPhys
       const radius = baseSize * (1 + Math.sin(i * 0.5) * 0.3); // 不规则半径
       points.push({
         x: radius * Math.cos(angle),
-        y: radius * Math.sin(angle)
+        y: radius * Math.sin(angle),
       });
     }
     vertices = points;
@@ -205,7 +222,7 @@ export const calculateBlockPhysics = (tx: ethers.TransactionResponse): BlockPhys
       else radius = innerRadius;
       return {
         x: radius * Math.cos(angle),
-        y: radius * Math.sin(angle)
+        y: radius * Math.sin(angle),
       };
     });
   } else if (isERC20) {
@@ -213,23 +230,23 @@ export const calculateBlockPhysics = (tx: ethers.TransactionResponse): BlockPhys
     const width = baseSize * 1.2;
     const height = baseSize * 1.5;
     vertices = [
-      { x: 0, y: -height/2 },         // 顶点
-      { x: width/2, y: 0 },          // 右翼
-      { x: width/4, y: height/4 },   // 右内
-      { x: width/4, y: height/2 },   // 右底
-      { x: -width/4, y: height/2 },  // 左底
-      { x: -width/4, y: height/4 },  // 左内
-      { x: -width/2, y: 0 }          // 左翼
+      { x: 0, y: -height / 2 }, // 顶点
+      { x: width / 2, y: 0 }, // 右翼
+      { x: width / 4, y: height / 4 }, // 右内
+      { x: width / 4, y: height / 2 }, // 右底
+      { x: -width / 4, y: height / 2 }, // 左底
+      { x: -width / 4, y: height / 4 }, // 左内
+      { x: -width / 2, y: 0 }, // 左翼
     ];
   } else if (isBigData) {
     // 宽扁矩形（大数据交易）
     const width = baseSize * 2;
     const height = baseSize * 0.5;
     vertices = [
-      { x: -width/2, y: -height/2 },
-      { x: width/2, y: -height/2 },
-      { x: width/2, y: height/2 },
-      { x: -width/2, y: height/2 }
+      { x: -width / 2, y: -height / 2 },
+      { x: width / 2, y: -height / 2 },
+      { x: width / 2, y: height / 2 },
+      { x: -width / 2, y: height / 2 },
     ];
   }
 
@@ -239,41 +256,41 @@ export const calculateBlockPhysics = (tx: ethers.TransactionResponse): BlockPhys
     highValue: {
       density: 3,
       speed: 12,
-      friction: 0.2
+      friction: 0.2,
     },
     // 高Gas交易：超快速、低摩擦
     highGas: {
       speed: 15,
       friction: 0.1,
-      density: 0.8
+      density: 0.8,
     },
     // 合约创建：中等速度，高弹性
     contract: {
       speed: 6,
       restitution: 0.9,
-      density: 1.5
+      density: 1.5,
     },
     // NFT：轻盈、高旋转
     nft: {
       density: 0.5,
       speed: 4,
-      spin: 0.3
+      spin: 0.3,
     },
     // 大数据：超重、低弹性
     bigData: {
       density: 2.5,
       restitution: 0.1,
-      friction: 0.9
-    }
+      friction: 0.9,
+    },
   };
 
   // 选择适当的物理属性集
   let physicsSet = {
-    speed: 5 + normalizedGas * 10,        // 基础速度更快 (5-15)
-    spin: (normalizedNonce - 0.5) * 0.4,  // 更大的旋转范围
-    density: 0.8 + normalizedValue * 2.2,  // 更大的密度范围
+    speed: 5 + normalizedGas * 10, // 基础速度更快 (5-15)
+    spin: (normalizedNonce - 0.5) * 0.4, // 更大的旋转范围
+    density: 0.8 + normalizedValue * 2.2, // 更大的密度范围
     restitution: 0.2 + normalizedGasLimit * 0.7,
-    friction: 0.1 + normalizedData * 0.9
+    friction: 0.1 + normalizedData * 0.9,
   };
 
   // 应用特殊物理属性
@@ -296,7 +313,7 @@ export const calculateBlockPhysics = (tx: ethers.TransactionResponse): BlockPhys
   return {
     size: baseSize,
     ...physicsSet,
-    vertices
+    vertices,
   };
 };
 
@@ -307,41 +324,41 @@ export const getBlockColor = (tx: ethers.TransactionResponse): string => {
   const gasPrice = Number(tx.gasPrice) || 0;
   const value = Number(tx.value) || 0;
   const dataSize = (tx.data?.length || 0) / 2 - 1;
-  
+
   const normalizedGas = Math.min(gasPrice / (500 * 1e9), 1);
   const normalizedValue = Math.min(value / (100 * 1e18), 1);
-  
+
   // 合约创建 - 耀眼的紫色
   if (!tx.to) {
     return `hsl(290, 100%, ${40 + normalizedGas * 30}%)`; // 更亮的紫色
   }
-  
+
   // 高价值交易 - 金色
   if (normalizedValue > 0.5) {
     return `hsl(45, 100%, ${50 + normalizedValue * 30}%)`; // 更亮的金色
   }
-  
+
   // 高Gas交易 - 红色
   if (normalizedGas > 0.7) {
     return `hsl(0, 100%, ${45 + normalizedGas * 25}%)`; // 更亮的红色
   }
-  
+
   // NFT交易 - 彩虹色
   if (tx.data?.startsWith('0x42842e0e')) {
     const hue = (Date.now() / 50) % 360; // 随时间变化的色相
     return `hsl(${hue}, 100%, 60%)`; // 更鲜艳的彩虹色
   }
-  
+
   // ERC20转账 - 蓝色
   if (tx.data?.startsWith('0xa9059cbb')) {
     return `hsl(210, 100%, ${50 + normalizedValue * 20}%)`; // 更亮的蓝色
   }
-  
+
   // 大数据交易 - 绿色
   if (dataSize > 5000) {
-    return `hsl(120, 100%, ${45 + (dataSize/10000) * 25}%)`; // 更亮的绿色
+    return `hsl(120, 100%, ${45 + (dataSize / 10000) * 25}%)`; // 更亮的绿色
   }
-  
+
   // 普通交易 - 基于gas和value的渐变色
   const baseHue = 180 + normalizedGas * 60;
   const saturation = 70 + normalizedValue * 30;
@@ -350,9 +367,12 @@ export const getBlockColor = (tx: ethers.TransactionResponse): string => {
 };
 
 export const createProvider = () => {
-  return new ethers.JsonRpcProvider(
-    'https://eth-mainnet.g.alchemy.com/v2/ShFElt5V8pPaMbA4djojAo4b1ndF3vIa'
-  );
+  const apiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
+  if (!apiKey) {
+    throw new Error('VITE_ALCHEMY_API_KEY not found in environment variables');
+  }
+
+  return new ethers.JsonRpcProvider(`https://eth-mainnet.g.alchemy.com/v2/${apiKey}`);
 };
 
 /**
