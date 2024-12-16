@@ -100,7 +100,20 @@ export class BlockManager {
             const tx = await this.provider.getTransaction(txHash);
             if (tx) {
               const gasPrice = Number(tx.gasPrice) || 0;
-              const isUniswapTx = tx.data.startsWith('0x...'); // 假设Uniswap交易的函数签名
+              const uniswapSignatures = [
+                '0x7ff36ab5', // swapExactETHForTokens
+                '0x38ed1739', // swapExactTokensForTokens
+                '0x18cbafe5', // swapExactTokensForETH
+                '0xfb3bdb41', // swapETHForExactTokens
+                '0x5c11d795', // swapExactTokensForTokensSupportingFeeOnTransferTokens
+                '0x791ac947', // swapExactTokensForETHSupportingFeeOnTransferTokens
+                '0xb6f9de95', // swapExactETHForTokensSupportingFeeOnTransferTokens
+                '0x04e45aaf', // exactInputSingle (Uniswap V3)
+                '0x414bf389', // exactInput (Uniswap V3)
+                '0xdb3e2198', // exactOutputSingle (Uniswap V3)
+                '0x09b81346'  // exactOutput (Uniswap V3)
+              ];
+              const isUniswapTx = uniswapSignatures.some(sig => tx.data.startsWith(sig));
               const isHighMEV = gasPrice > 300 * 1e9; // 假设高MEV交易的阈值
 
               // Uniswap交易导致低重力
