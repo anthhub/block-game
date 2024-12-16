@@ -107,7 +107,7 @@ export class Player {
   }
 
   private setupControls() {
-    document.addEventListener('keydown', (event) => {
+    document.addEventListener('keydown', event => {
       switch (event.key) {
         case 'ArrowLeft':
           Matter.Body.setVelocity(this.body, {
@@ -146,7 +146,7 @@ export class Player {
       }
     });
 
-    document.addEventListener('keyup', (event) => {
+    document.addEventListener('keyup', event => {
       switch (event.key) {
         case 'ArrowDown':
         case 's':
@@ -168,12 +168,12 @@ export class Player {
     let touchStartY = 0;
     let touchStartX = 0;
 
-    document.addEventListener('touchstart', (event) => {
+    document.addEventListener('touchstart', event => {
       touchStartY = event.touches[0].clientY;
       touchStartX = event.touches[0].clientX;
     });
 
-    document.addEventListener('touchmove', (event) => {
+    document.addEventListener('touchmove', event => {
       const touchY = event.touches[0].clientY;
       const touchX = event.touches[0].clientX;
       const deltaY = touchY - touchStartY;
@@ -258,6 +258,14 @@ export class Player {
         y: groundLevel,
       });
       this.isJumping = false;
+    }
+
+    // 添加默认下落加速度
+    if (!this.isPressingDown && this.body.position.y < groundLevel) {
+      Matter.Body.setVelocity(this.body, {
+        x: this.body.velocity.x,
+        y: Math.min(this.body.velocity.y + GAME_CONFIG.PHYSICS.MIN_FALLING_SPEED),
+      });
     }
 
     // 如果按着向下键，持续增加下落速度

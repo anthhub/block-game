@@ -7,17 +7,17 @@ export const GAME_CONFIG = {
   PLAYER: {
     WIDTH: 30,
     HEIGHT: 30,
-    JUMP_FORCE: -7, // 减小跳跃力度，原来是 -10
+    JUMP_FORCE: -18, // 继续增加跳跃力度
     MOVE_SPEED: 5,
     INITIAL_LIVES: 3,
     COLOR: '#00ff00',
   },
   PHYSICS: {
     GRAVITY: {
-      BASE: 0.0004, // 进一步减小基础重力
-      MAX: 0.001, // 进一步减小最大重力
-      MIN: 0.0002, // 进一步减小最小重力
-      SCALE_FACTOR: 1.2, // 进一步减小重力缩放因子
+      BASE: 0.004, // 增加基础重力
+      MAX: 0.008, // 增加最大重力
+      MIN: 0.002, // 增加最小重力
+      SCALE_FACTOR: 2.0, // 增加重力缩放因子
     },
     NETWORK: {
       MAX_GAS_PRICE: 500, // 最大 gas 价格 (Gwei)
@@ -28,9 +28,9 @@ export const GAME_CONFIG = {
         PENDING_TX: 0.3, // 待处理交易权重
       },
     },
-    DEFAULT_GRAVITY: 0.15, // 进一步减小默认重力
-    LOW_GRAVITY: 0.05, // 进一步减小低重力值
-    MIN_FALLING_SPEED: 0.5, // 进一步减小最小下落速度
+    DEFAULT_GRAVITY: 0.8, // 增加默认重力
+    LOW_GRAVITY: 0.3, // 增加低重力值
+    MIN_FALLING_SPEED: 0.3, // 增加最小下落速度
   },
   POWER_UPS: {
     SIZE: 15,
@@ -48,14 +48,14 @@ export const GAME_CONFIG = {
     },
   },
   BLOCK: {
-    MIN_SIZE: 30,
-    MAX_SIZE: 100,
+    MIN_SIZE: 20, // 减小最小尺寸
+    MAX_SIZE: 60, // 减小最大尺寸
     INITIAL_Y: -50,
     SPAWN_INTERVAL: {
-      BASE: 100, // 基础生成间隔 (ms)
-      MIN: 50, // 最小生成间隔
-      MAX: 200, // 最大生成间隔
-      VARIANCE: 0.7, // 随机变化范围
+      BASE: 300, // 增加基础生成间隔
+      MIN: 200, // 增加最小生成间隔
+      MAX: 500, // 增加最大生成间隔
+      VARIANCE: 0.8, // 增加随机变化范围
     },
     STATUS_UPDATE_INTERVAL: 5000, // 区块状态更新间隔 (ms)
     GAS_PRICE_THRESHOLDS: {
