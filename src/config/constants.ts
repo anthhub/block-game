@@ -14,10 +14,10 @@ export const GAME_CONFIG = {
   },
   PHYSICS: {
     GRAVITY: {
-      BASE: 0.004, // 增加基础重力
-      MAX: 0.008, // 增加最大重力
-      MIN: 0.002, // 增加最小重力
-      SCALE_FACTOR: 2.0, // 增加重力缩放因子
+      BASE: 0.002, // 降低基础重力
+      MAX: 0.004, // 降低最大重力
+      MIN: 0.001, // 降低最小重力
+      SCALE_FACTOR: 1.5, // 降低重力缩放因子
     },
     NETWORK: {
       MAX_GAS_PRICE: 500, // 最大 gas 价格 (Gwei)
@@ -28,9 +28,9 @@ export const GAME_CONFIG = {
         PENDING_TX: 0.3, // 待处理交易权重
       },
     },
-    DEFAULT_GRAVITY: 0.8, // 增加默认重力
-    LOW_GRAVITY: 0.3, // 增加低重力值
-    MIN_FALLING_SPEED: 0.3, // 增加最小下落速度
+    DEFAULT_GRAVITY: 0.4, // 降低默认重力
+    LOW_GRAVITY: 0.15, // 降低低重力值
+    MIN_FALLING_SPEED: 0.15, // 降低最小下落速度
   },
   POWER_UPS: {
     SIZE: 15,
